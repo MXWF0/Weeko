@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Weeko" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowSplashScreenBackground">@color/weeko_surface</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_weeko_foreground</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@color/weeko_icon_background</item>
+    </style>
+</resources>

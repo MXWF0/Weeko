@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Weeko 课程表</string>
+    <string name="baseline_message">Weeko 课程表开发基线</string>
+    <string name="about_title">关于 Weeko</string>
+    <string name="about_body">Weeko 是本地优先的高校课程表。WakeUp 文件仅作为兼容导入来源，Weeko 不依赖 WakeUp 运行。</string>
+    <string name="design_system_button">打开设计系统预览</string>
+    <string name="design_system_title">Weeko Design System</string>
+    <string name="course_detail_button">打开课程详情原型</string>
+    <string name="course_detail_preview_title">课程详情原型</string>
+    <string name="course_editor_title">编辑课程</string>
+</resources>

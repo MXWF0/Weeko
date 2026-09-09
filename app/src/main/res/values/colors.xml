@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="weeko_surface">#FFF8F5</color>
+    <color name="weeko_icon_background">#335C81</color>
+    <color name="weeko_icon_foreground">#FFFFFFFF</color>
+</resources>

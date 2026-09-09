@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Weeko" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">#335C81</item>
+        <item name="android:navigationBarColor">@color/weeko_surface</item>
+        <item name="android:statusBarColor">@color/weeko_surface</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+</resources>

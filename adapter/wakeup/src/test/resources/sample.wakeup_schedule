@@ -1,0 +1,5 @@
+{"id":1,"name":"默认作息","sameLen":true,"courseLen":50,"sameBreakLen":false,"theBreakLen":10}
+[{"node":1,"startTime":"08:00","endTime":"08:50","timeTable":1},{"node":2,"startTime":"09:00","endTime":"09:50","timeTable":1}]
+{"id":1,"tableName":"示例课表","nodes":2,"background":"","timeTable":1,"startDate":"2025-09-01","maxWeek":20,"itemHeight":64,"itemAlpha":50,"itemTextSize":12,"widgetItemHeight":64,"widgetItemAlpha":50,"widgetItemTextSize":12,"strokeColor":-2130706433,"widgetStrokeColor":-2130706433,"textColor":-16777216,"widgetTextColor":-16777216,"courseTextColor":-1,"widgetCourseTextColor":-1,"showSat":true,"showSun":true,"sundayFirst":false,"showOtherWeekCourse":true,"showTime":false,"type":0}
+[{"id":1,"courseName":"高等数学","color":"#1a73e8","tableId":1,"note":"","credit":4.0}]
+[{"id":1,"day":1,"room":"A101","teacher":"张老师","startNode":1,"step":2,"startWeek":1,"endWeek":16,"type":0,"tableId":1,"level":0,"ownTime":false,"startTime":"","endTime":""}]

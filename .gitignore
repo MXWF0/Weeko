@@ -1,0 +1,60 @@
+# Gradle and Android build output
+.gradle/
+.gradle-build/
+**/build/
+gradle-local/
+gradle/local-libs/
+local.properties
+
+# APK/AAB artifacts and signing material
+*.apk
+*.aab
+*.apks
+*.jks
+*.keystore
+*.p12
+*.credential.xml
+*.pem
+
+# Device captures, logs and local test data
+**/device/
+**/logs/
+*.log
+*.png
+*.webp
+*.jpg
+*.jpeg
+
+# APK reverse-engineering and historical comparison workspaces
+.restoration-apktool/
+.wakeup-restoration/
+.wakeup-restoration-apktool-res-test-gradle/
+.wakeup-restoration-gradle/
+.wakeup-restoration-resource-test-gradle/
+.weeko-v0.1-apktool/
+.weeko-v0.2-apktool/
+.weeko-v0.3-apktool/
+.weeko-v0.4-apktool/
+.weeko-v0.5-apktool/
+.weeko-v0.6-apktool/
+.jadx-appdata/
+.jadx-home/
+.stage4a-jadx/
+.stage4a-jadx-home/
+.wakeup-public-source/
+wakeup6.0.23.apk
+
+# Temporary local patch/replay workspaces
+repro-apktool/
+*.repacked
+
+# Superseded local release scripts and source snapshots
+tools/build-weeko-v02.ps1
+tools/build-weeko-v03.ps1
+tools/build-weeko-v04.ps1
+tools/build-weeko-v05.ps1
+tools/create-weeko-release-key.ps1
+v02-about-source/
+v03-about-source/
+v04-about-source/
+v05-about-source/
