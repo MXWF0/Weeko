@@ -7,7 +7,8 @@ $ErrorActionPreference = "Stop"
 $project = (Resolve-Path -LiteralPath $ProjectPath).Path
 $stage8Script = Join-Path $PSScriptRoot "replay-weeko-v08-fluent-stage8-patches.ps1"
 
-& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $stage8Script -ProjectPath $project
+$pwsh = (Get-Command pwsh.exe -ErrorAction Stop).Source
+& $pwsh -NoProfile -File $stage8Script -ProjectPath $project
 if ($LASTEXITCODE -ne 0) { throw "Fluent Stage 8 patch replay failed; Fluent Stage 9 was not applied." }
 
 function Replace-FluentStage9ExactText {

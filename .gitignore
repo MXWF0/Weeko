@@ -21,6 +21,7 @@ local.properties
 **/logs/
 *.log
 *.png
+!assets/weeko-launcher.png
 *.webp
 *.jpg
 *.jpeg
