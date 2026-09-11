@@ -1,6 +1,6 @@
 # Weeko v1.0.0 发布报告
 
-状态：正式 APK 已构建，核心回归通过，准备发布  
+状态：已发布  
 日期：2026-09-11（Asia/Shanghai）
 
 ## 版本与迁移
@@ -50,5 +50,5 @@ keystore、加密凭据和密码均未写入 Git。
 
 正式构建入口为 [`tools/build-weeko-v10-release.ps1`](../tools/build-weeko-v10-release.ps1)。该脚本固定校验新 keystore、alias、证书摘要、zipalign、APK 签名和 v1.0.0 元数据。
 
-最终提交：待提交后填写。  
-GitHub Release：待发布后填写。
+Release 代码提交：`7f3812a`（`Prepare Weeko v1.0.0 release`）。  
+GitHub Release：[v1.0.0](https://github.com/MXWF0/Weeko/releases/tag/v1.0.0)。
