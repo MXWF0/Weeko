@@ -10,6 +10,7 @@ import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
+import android.content.res.Resources;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -34,13 +35,16 @@ import android.widget.TextView;
  * read the legacy database, preferences, network clients, or WakeUp adapters.
  */
 public final class WeekoAboutActivity extends Activity {
+    private Resources paletteResources;
+
     private int dp(float value) {
         return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
     }
 
     private int color(String name) {
         int id = getResources().getIdentifier(name, "color", getPackageName());
-        return getResources().getColor(id);
+        Resources resources = paletteResources == null ? getResources() : paletteResources;
+        return resources.getColor(id);
     }
 
     private TextView label(String value, float size, int color, boolean bold) {
@@ -208,8 +212,15 @@ public final class WeekoAboutActivity extends Activity {
     protected void onCreate(Bundle state) {
         super.onCreate(state);
 
-        boolean dark = (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)
+        boolean systemDark = (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)
                 == Configuration.UI_MODE_NIGHT_YES;
+        int themeMode = getSharedPreferences("config", Context.MODE_PRIVATE)
+                .getInt("day_night_theme", 2);
+        boolean dark = themeMode == 1 || (themeMode == 2 && systemDark);
+        Configuration effective = new Configuration(getResources().getConfiguration());
+        effective.uiMode = (effective.uiMode & ~Configuration.UI_MODE_NIGHT_MASK)
+                | (dark ? Configuration.UI_MODE_NIGHT_YES : Configuration.UI_MODE_NIGHT_NO);
+        paletteResources = createConfigurationContext(effective).getResources();
         int background = color("md_theme_background");
         int surface = color("md_theme_surfaceContainerLow");
         int text = color("md_theme_onBackground");
