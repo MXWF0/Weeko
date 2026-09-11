@@ -79,7 +79,7 @@ final class GitHubUpdateChecker {
             connection.setReadTimeout(15_000);
             connection.setRequestProperty("Accept", "application/vnd.github+json");
             connection.setRequestProperty("X-GitHub-Api-Version", "2022-11-28");
-            connection.setRequestProperty("User-Agent", "Weeko-Android/0.6.0-test1");
+            connection.setRequestProperty("User-Agent", "Weeko-Android/1.0.0");
 
             int status = connection.getResponseCode();
             String statusError = httpFailureMessage(
