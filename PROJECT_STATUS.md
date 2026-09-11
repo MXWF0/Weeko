@@ -1,5 +1,21 @@
 # Weeko / WakeUp 项目状态
 
+## V1.0.1 导入与首次引导热修复（2026-09-11）
+
+v1.0.1 已完成正式签名构建和设备回归：`io.github.mxwf.weeko` 的
+`versionCode=13`、`versionName=1.0.1`，正式 APK SHA-256 为
+`A2D0E9406E0B8861D28CCF52010C7F06DE6E62BB31AF3AFC1E2EEC9A7098CF18`。本轮只修复后台
+清理后的首次引导持久化和导入引导链：`has_intro` 完成写入改为同步落盘，导入提示直接
+衔接现有“更多操作”入口；数据库、备份格式、Widget 和旧 Activity/Provider/Receiver
+名称未改写。
+
+在设备 `3fde7e33` 上，首次教程完成后强制停止并重启不再出现隐私/引导提示；从“导入课程
+→ 从文件导入 → 从备份”选择 `sample.wakeup_schedule` 返回“导入成功(ﾟ▽ﾟ)/”。构建和
+回归证据、已知边界见 [`docs/V1.0.1_RELEASE_REPORT.md`](docs/V1.0.1_RELEASE_REPORT.md)。
+正式构建入口为 [`tools/build-weeko-v101-release.ps1`](tools/build-weeko-v101-release.ps1)。
+
+最后更新：2026-09-11（Asia/Shanghai）
+
 ## V0.6 维护基础（2026-09-05）
 
 `build/v0.6/Weeko-v0.6.0-test1.apk` 已完成本地可重复构建和设备回归：包名为
