@@ -91,13 +91,10 @@ Replace-Stage7ExactText $rail @'
 .method public static returnToCurrent(Lcom/suda/yzune/wakeupschedule/schedule/ScheduleActivity;)V
 '@ @'
 .method public static updateFromPage(Lcom/suda/yzune/wakeupschedule/schedule/ScheduleActivity;I)V
-    .locals 2
-    invoke-virtual {p0}, Lcom/suda/yzune/wakeupschedule/schedule/ScheduleActivity;->OooOo0o()Lcom/suda/yzune/wakeupschedule/schedule/o0000O;
-    move-result-object v0
-    iput p1, v0, Lcom/suda/yzune/wakeupschedule/schedule/o0000O;->OooOO0o:I
-    sget-object v1, Lcom/suda/yzune/wakeupschedule/schedule/FluentWeekRail;->OooO0o:Lcom/suda/yzune/wakeupschedule/schedule/FluentWeekRail;
-    if-eqz v1, :week_page_sync_done
-    invoke-direct {v1}, Lcom/suda/yzune/wakeupschedule/schedule/FluentWeekRail;->OooO0oo()V
+    .locals 1
+    sget-object v0, Lcom/suda/yzune/wakeupschedule/schedule/FluentWeekRail;->OooO0o:Lcom/suda/yzune/wakeupschedule/schedule/FluentWeekRail;
+    if-eqz v0, :week_page_sync_done
+    invoke-direct {v0}, Lcom/suda/yzune/wakeupschedule/schedule/FluentWeekRail;->OooO0oo()V
     :week_page_sync_done
     return-void
 .end method
@@ -164,6 +161,29 @@ Replace-Stage7ExactText "apktool.yml" @'
 '@ @'
   versionCode: 11
   versionName: 0.8.0-settings-stage7
+'@
+
+# Settings changes can resume an existing ScheduleActivity without rebuilding
+# its views. Reapply the theme-dependent top bar and artwork colors at that
+# boundary so both light and dark mode are reflected immediately.
+$schedule = "smali\com\suda\yzune\wakeupschedule\schedule\ScheduleActivity.smali"
+Replace-Stage7ExactText $schedule @'
+    invoke-super {p0}, Landroidx/fragment/app/FragmentActivity;->onResume()V
+
+    .line 2
+    .line 3
+    .line 4
+    new-instance v0, Lcom/suda/yzune/wakeupschedule/schedule/ScheduleActivity$onResume$1;
+'@ @'
+    invoke-super {p0}, Landroidx/fragment/app/FragmentActivity;->onResume()V
+
+    invoke-static {p0}, Lcom/suda/yzune/wakeupschedule/schedule/FluentTopBar;->install(Lcom/suda/yzune/wakeupschedule/schedule/ScheduleActivity;)V
+    invoke-static {p0}, Lcom/suda/yzune/wakeupschedule/schedule/FluentSchedulePalette;->install(Lcom/suda/yzune/wakeupschedule/schedule/ScheduleActivity;)V
+
+    .line 2
+    .line 3
+    .line 4
+    new-instance v0, Lcom/suda/yzune/wakeupschedule/schedule/ScheduleActivity$onResume$1;
 '@
 
 Write-Output "Applied Weeko v0.8 Stage 7 About/theme, week-sync, and dark-header fixes to $project"
