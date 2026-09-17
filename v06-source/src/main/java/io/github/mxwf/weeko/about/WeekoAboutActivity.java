@@ -296,16 +296,10 @@ public final class WeekoAboutActivity extends Activity {
         content.addView(version, new LinearLayout.LayoutParams(-1, -2));
 
         addCard(content, card("关于 Weeko",
-                "Weeko 是面向高校学习的本地优先课程表。当前版本继续以已验证的兼容母体维护课程、课表、作息和导入流程，并逐步替换可独立维护的区域。",
+                "Weeko 面向高校课程表使用。当前版本沿用已验证的课程、课表、作息和导入流程，并逐步整理可独立维护的页面。",
                 surface, text, secondary));
         addCard(content, card("数据在本机",
-                "课程数据库和大多数设置保存在当前设备。本页面不读取课程库或 SharedPreferences，也不会改变 Room v11、原有键名或 .wakeup_schedule 兼容格式。",
-                surface, text, secondary));
-        addCard(content, card("联网边界",
-                "本页检查更新时仅访问 GitHub 的 MXWF0/Weeko Releases API，不内置 Token。教务导入、在线分享和申请适配仍来自兼容母体，可能访问旧版或学校服务；请勿提交密码、Cookie、Token 或个人信息。",
-                surface, text, secondary));
-        addCard(content, card("签名重置",
-                "v1.0.0 起 Weeko 使用新的长期正式签名，旧版本不能直接覆盖升级。请先导出所有课表并确认备份可用，另行记录设置；课表文件不等于完整应用备份。v1.0.0 后续版本沿用同一签名。卸载会删除本机应用数据。",
+                "课程数据库和大多数设置保存在这台设备。关于页面只读取显示主题和版本信息，不改动 Room v11 数据、现有设置键名或 .wakeup_schedule 兼容格式。",
                 surface, text, secondary));
 
         Button stableUpdate = actionButton("检查更新", blue, buttonSurface);
@@ -313,16 +307,16 @@ public final class WeekoAboutActivity extends Activity {
         addAction(content, stableUpdate);
 
         addCard(content, card("反馈与联系",
-                "维护邮箱：mxwfwdw@outlook.com\n用于 Weeko 问题反馈；联系按钮只复制邮箱，不自动打开浏览器。",
+                "维护邮箱：mxwfwdw@outlook.com\n用于问题反馈。点击联系我们后，应用只复制邮箱，不会自动打开浏览器。",
                 surface, text, secondary));
         Button contact = actionButton("联系我们", blue, buttonSurface);
         contact.setOnClickListener(view -> showContactDialog());
         addAction(content, contact);
         addCard(content, card("使用与反馈",
-                "Weeko 面向日常课程表使用。遇到崩溃或 ANR，请保存设备型号、操作步骤和 logcat，再反馈给维护者。",
+                "如果遇到崩溃或 ANR，请一起提供设备型号、复现步骤和相关日志，方便定位问题。",
                 surface, text, secondary));
         addCard(content, card("来源与许可证",
-                "APK 保留兼容母体及第三方库的许可证和声明。本页为 Weeko 新增的平台源码，不代表旧版兼容母体的完整源码恢复。",
+                "APK 保留兼容母体和第三方库的许可证与声明。这个关于页面是 Weeko 新增的平台代码，不等同于旧兼容母体的完整源码。",
                 surface, text, secondary));
 
         scroll.addView(content, new ScrollView.LayoutParams(-1, -2));

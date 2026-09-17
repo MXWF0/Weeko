@@ -180,10 +180,7 @@ public final class PasswordVaultActivity extends Activity {
         background.setCornerRadius(dp(16));
         card.setBackground(background);
 
-        card.addView(text(record.name, 18f, onSurface, true), new LinearLayout.LayoutParams(-1, -2));
-        if (!record.school.isEmpty()) {
-            card.addView(text(record.school, 14f, secondary, false), new LinearLayout.LayoutParams(-1, -2));
-        }
+        card.addView(text(record.username, 18f, onSurface, true), new LinearLayout.LayoutParams(-1, -2));
         TextView username = text("用户名  " + record.username, 15f, onSurface, false);
         username.setPadding(0, dp(10), 0, 0);
         card.addView(username, new LinearLayout.LayoutParams(-1, -2));
@@ -235,8 +232,6 @@ public final class PasswordVaultActivity extends Activity {
         LinearLayout fields = new LinearLayout(this);
         fields.setOrientation(LinearLayout.VERTICAL);
         fields.setPadding(dp(20), 0, dp(20), 0);
-        EditText name = field("名称", existing == null ? "" : existing.name);
-        EditText school = field("学校", existing == null ? "" : existing.school);
         EditText username = field("用户名", existing == null ? "" : existing.username);
         EditText password = field("密码", existing == null ? "" : existing.password);
         password.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
@@ -244,8 +239,6 @@ public final class PasswordVaultActivity extends Activity {
         EditText notes = field("备注", existing == null ? "" : existing.notes);
         notes.setSingleLine(false);
         notes.setMinLines(2);
-        fields.addView(name);
-        fields.addView(school);
         fields.addView(username);
         fields.addView(password);
         fields.addView(notes);
@@ -260,13 +253,8 @@ public final class PasswordVaultActivity extends Activity {
                 .create();
         dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
                 .setOnClickListener(view -> {
-                    String nameValue = name.getText().toString().trim();
                     String usernameValue = username.getText().toString().trim();
                     String passwordValue = password.getText().toString();
-                    if (nameValue.isEmpty()) {
-                        name.setError("请输入名称");
-                        return;
-                    }
                     if (usernameValue.isEmpty()) {
                         username.setError("请输入用户名");
                         return;
@@ -277,8 +265,8 @@ public final class PasswordVaultActivity extends Activity {
                     }
                     Record changed = new Record(
                             existing == null ? UUID.randomUUID().toString() : existing.id,
-                            nameValue,
-                            school.getText().toString().trim(),
+                            existing == null ? usernameValue : existing.name,
+                            existing == null ? "" : existing.school,
                             usernameValue,
                             passwordValue,
                             notes.getText().toString().trim());
@@ -296,7 +284,7 @@ public final class PasswordVaultActivity extends Activity {
     private void confirmDelete(Record record) {
         new AlertDialog.Builder(this)
                 .setTitle("删除账号")
-                .setMessage("确定删除“" + record.name + "”？")
+                .setMessage("确定删除“" + record.username + "”？")
                 .setNegativeButton("取消", null)
                 .setPositiveButton("删除", (dialog, which) -> {
                     records.remove(record);
