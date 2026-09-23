@@ -3,17 +3,22 @@ package io.github.mxwf.weeko.schedule;
 import android.animation.ValueAnimator;
 import android.content.Context;
 import android.content.res.Configuration;
+import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.PixelFormat;
+import android.graphics.Path;
 import android.graphics.Rect;
+import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewParent;
+import android.view.ViewTreeObserver;
 import android.view.animation.DecelerateInterpolator;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
@@ -30,6 +35,11 @@ import java.lang.reflect.Method;
  * refresh action after a user selection.
  */
 public final class WeekRailController implements SeekBar.OnSeekBarChangeListener {
+    // The first weekday cell in each ViewPager page header.
+    private static final int FIRST_WEEKDAY_HEADER_ID = 0x7f0900a2;
+    private static final int BACKDROP_SCALE = 4;
+    private static final int BACKDROP_BLUR_RADIUS = 5;
+    private static final int BACKDROP_BLUR_PASSES = 3;
     private static final int BLUE = 0xff2f80ff;
     private static final int LIGHT_SURFACE = 0xfff7faff;
     private static final int DARK_SURFACE = 0xff1c222b;
@@ -48,8 +58,11 @@ public final class WeekRailController implements SeekBar.OnSeekBarChangeListener
     private final SeekBar seekBar;
     private final RailThumbDrawable thumb;
     private final RailOverlay overlay;
+    private final BackdropBlurView backdrop;
     private final int density;
+    private ViewGroup rootParent;
     private boolean showing;
+    private boolean railPositioned;
     private int maxWeek;
     private int realWeek;
 
@@ -59,6 +72,25 @@ public final class WeekRailController implements SeekBar.OnSeekBarChangeListener
             hide();
         }
     };
+
+    private final Runnable backdropTask = new Runnable() {
+        @Override
+        public void run() {
+            refreshBackdrop();
+        }
+    };
+
+    private final ViewTreeObserver.OnGlobalLayoutListener positionListener =
+            new ViewTreeObserver.OnGlobalLayoutListener() {
+                @Override
+                public void onGlobalLayout() {
+                    if (showing) {
+                        scheduleBackdropRefresh();
+                    } else {
+                        updateRailPosition();
+                    }
+                }
+            };
 
     private WeekRailController(FrameLayout rail, Object activity, View[] dateViews) {
         this.rail = rail;
@@ -70,8 +102,12 @@ public final class WeekRailController implements SeekBar.OnSeekBarChangeListener
 
         rail.setClipChildren(false);
         rail.setElevation(dp(2));
-        rail.setBackground(surfaceBackground(context, dark));
+        rail.setBackground(railOutline(context));
         rail.setVisibility(View.GONE);
+
+        backdrop = new BackdropBlurView(context, surfaceBackground(context, dark), dp(18));
+        rail.addView(backdrop, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
         LinearLayout row = new LinearLayout(context);
         row.setOrientation(LinearLayout.HORIZONTAL);
@@ -158,12 +194,15 @@ public final class WeekRailController implements SeekBar.OnSeekBarChangeListener
     public static WeekRailController attach(FrameLayout rail, Object activity, View[] dateViews) {
         WeekRailController controller = new WeekRailController(rail, activity, dateViews);
         ViewGroup parent = (ViewGroup) findFieldValue(activity, "Oooo0OO", "OooOo00");
+        controller.rootParent = parent;
         ViewGroup.MarginLayoutParams params = new ViewGroup.MarginLayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, controller.dp(52));
         params.leftMargin = controller.dp(8);
         params.rightMargin = controller.dp(8);
-        params.topMargin = controller.dp(100);
+        params.topMargin = 0;
         parent.addView(rail, params);
+        parent.getViewTreeObserver().addOnGlobalLayoutListener(controller.positionListener);
+        controller.updateRailPosition();
         return controller;
     }
 
@@ -177,6 +216,7 @@ public final class WeekRailController implements SeekBar.OnSeekBarChangeListener
 
     public void syncFromPage(int week) {
         updateUi(week);
+        scheduleBackdropRefresh();
     }
 
     public void returnToCurrent() {
@@ -193,6 +233,7 @@ public final class WeekRailController implements SeekBar.OnSeekBarChangeListener
         WeekRailController controller = currentController(activity);
         if (controller != null) {
             controller.updateUi(current);
+            controller.scheduleBackdropRefresh();
         }
     }
 
@@ -216,6 +257,7 @@ public final class WeekRailController implements SeekBar.OnSeekBarChangeListener
 
     private void show() {
         removeHideCallbacks();
+        updateRailPosition();
         updateUi(readPageWeek());
         showing = true;
         for (View dateView : dateViews) {
@@ -228,6 +270,7 @@ public final class WeekRailController implements SeekBar.OnSeekBarChangeListener
         rail.setVisibility(View.VISIBLE);
         rail.setAlpha(0f);
         rail.animate().alpha(1f).setDuration(180L).start();
+        scheduleBackdropRefresh();
         scheduleHide();
     }
 
@@ -237,6 +280,7 @@ public final class WeekRailController implements SeekBar.OnSeekBarChangeListener
             return;
         }
         showing = false;
+        removeBackdropCallbacks();
         for (View dateView : dateViews) {
             dateView.animate().cancel();
             dateView.setVisibility(View.VISIBLE);
@@ -259,6 +303,133 @@ public final class WeekRailController implements SeekBar.OnSeekBarChangeListener
 
     private void removeHideCallbacks() {
         rail.removeCallbacks(hideTask);
+    }
+
+    private void scheduleBackdropRefresh() {
+        if (!showing) {
+            return;
+        }
+        removeBackdropCallbacks();
+        rail.postDelayed(backdropTask, 72L);
+    }
+
+    private void removeBackdropCallbacks() {
+        rail.removeCallbacks(backdropTask);
+    }
+
+    private boolean updateRailPosition() {
+        ViewGroup pager = (ViewGroup) viewPager();
+        Object pageHolder = invoke(pager.getChildAt(0), "Oooo000",
+                new Class<?>[]{int.class}, new Object[]{Integer.valueOf(readPageWeek() - 1)});
+        if (pageHolder == null) {
+            return false;
+        }
+        View page = (View) getFieldValue(pageHolder, "itemView");
+        View header = page.findViewById(FIRST_WEEKDAY_HEADER_ID);
+        if (header == null || header.getWidth() == 0 || header.getHeight() == 0
+                || rootParent == null) {
+            return false;
+        }
+        int[] headerLocation = new int[2];
+        int[] parentLocation = new int[2];
+        header.getLocationInWindow(headerLocation);
+        rootParent.getLocationInWindow(parentLocation);
+        int left = headerLocation[0] - parentLocation[0];
+        int right = left + header.getWidth();
+        ViewParent headerParent = header.getParent();
+        if (headerParent instanceof ViewGroup) {
+            ViewGroup headerGroup = (ViewGroup) headerParent;
+            for (int id = FIRST_WEEKDAY_HEADER_ID + 1;
+                 id < FIRST_WEEKDAY_HEADER_ID + 7; id++) {
+                View day = headerGroup.findViewById(id);
+                if (day != null && day.getVisibility() == View.VISIBLE) {
+                    int[] dayLocation = new int[2];
+                    day.getLocationInWindow(dayLocation);
+                    right = Math.max(right, dayLocation[0] - parentLocation[0] + day.getWidth());
+                }
+            }
+        }
+        int top = headerLocation[1] - parentLocation[1] - rootParent.getPaddingTop();
+        left -= rootParent.getPaddingLeft();
+        right = rootParent.getWidth() - rootParent.getPaddingRight() - right;
+        int height = header.getHeight();
+        ViewGroup.MarginLayoutParams params =
+                (ViewGroup.MarginLayoutParams) rail.getLayoutParams();
+        if (params.leftMargin != left || params.rightMargin != right
+                || params.topMargin != top || params.height != height) {
+            params.leftMargin = left;
+            params.rightMargin = right;
+            params.topMargin = top;
+            params.height = height;
+            rail.setLayoutParams(params);
+        }
+        railPositioned = true;
+        return true;
+    }
+
+    private void refreshBackdrop() {
+        if (!showing || !railPositioned || rootParent == null
+                || rail.getWidth() == 0 || rail.getHeight() == 0) {
+            return;
+        }
+        int width = Math.max(1, rail.getWidth() / BACKDROP_SCALE);
+        int height = Math.max(1, rail.getHeight() / BACKDROP_SCALE);
+        Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        canvas.scale(width / (float) rail.getWidth(), height / (float) rail.getHeight());
+        canvas.translate(-rail.getLeft(), -rail.getTop());
+        float alpha = rail.getAlpha();
+        rail.setAlpha(0f);
+        try {
+            rootParent.draw(canvas);
+        } finally {
+            rail.setAlpha(alpha);
+        }
+        blur(bitmap, BACKDROP_BLUR_RADIUS, BACKDROP_BLUR_PASSES);
+        backdrop.setBitmap(bitmap);
+    }
+
+    private static void blur(Bitmap bitmap, int radius, int passes) {
+        int width = bitmap.getWidth();
+        int height = bitmap.getHeight();
+        int[] pixels = new int[width * height];
+        int[] temporary = new int[pixels.length];
+        int[] output = new int[pixels.length];
+        bitmap.getPixels(pixels, 0, width, 0, 0, width, height);
+        for (int pass = 0; pass < passes; pass++) {
+            blurAxis(pixels, temporary, width, height, radius, true);
+            blurAxis(temporary, output, width, height, radius, false);
+            System.arraycopy(output, 0, pixels, 0, pixels.length);
+        }
+        bitmap.setPixels(pixels, 0, width, 0, 0, width, height);
+    }
+
+    private static void blurAxis(int[] source, int[] destination, int width,
+                                 int height, int radius, boolean horizontal) {
+        int lines = horizontal ? height : width;
+        int length = horizontal ? width : height;
+        for (int line = 0; line < lines; line++) {
+            for (int position = 0; position < length; position++) {
+                int alpha = 0;
+                int red = 0;
+                int green = 0;
+                int blue = 0;
+                int count = 0;
+                for (int sample = Math.max(0, position - radius);
+                     sample <= Math.min(length - 1, position + radius); sample++) {
+                    int index = horizontal ? line * width + sample : sample * width + line;
+                    int color = source[index];
+                    alpha += Color.alpha(color);
+                    red += Color.red(color);
+                    green += Color.green(color);
+                    blue += Color.blue(color);
+                    count++;
+                }
+                int index = horizontal ? line * width + position : position * width + line;
+                destination[index] = Color.argb(alpha / count, red / count,
+                        green / count, blue / count);
+            }
+        }
     }
 
     private void updateUi(int week) {
@@ -338,7 +509,6 @@ public final class WeekRailController implements SeekBar.OnSeekBarChangeListener
         int week = progress + 1;
         selectPage(activity, week - 1, true);
         updateUi(week);
-        scheduleHide();
     }
 
     @Override
@@ -350,6 +520,7 @@ public final class WeekRailController implements SeekBar.OnSeekBarChangeListener
     @Override
     public void onStopTrackingTouch(SeekBar bar) {
         thumb.animateTo(false);
+        scheduleBackdropRefresh();
         scheduleHide();
     }
 
@@ -365,12 +536,16 @@ public final class WeekRailController implements SeekBar.OnSeekBarChangeListener
 
     private static GradientDrawable surfaceBackground(Context context, boolean dark) {
         GradientDrawable drawable = new GradientDrawable();
-        // Keep the original Fluent rail's translucent surface so the weekday
-        // row remains softly visible beneath the control without reintroducing
-        // the old green tint.
-        drawable.setColor(dark ? 0xe61c222b : 0xe6f7faff);
+        drawable.setColor(dark ? 0xd01c222b : 0xd0f7faff);
         drawable.setCornerRadius(18f * context.getResources().getDisplayMetrics().density);
-        drawable.setStroke(1, dark ? 0x355e7192 : 0x1f5d7db5);
+        drawable.setStroke(1, dark ? 0x4a5e7192 : 0x3d5d7db5);
+        return drawable;
+    }
+
+    private static GradientDrawable railOutline(Context context) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setColor(Color.TRANSPARENT);
+        drawable.setCornerRadius(18f * context.getResources().getDisplayMetrics().density);
         return drawable;
     }
 
@@ -494,6 +669,42 @@ public final class WeekRailController implements SeekBar.OnSeekBarChangeListener
         @Override
         public int getOpacity() {
             return PixelFormat.TRANSLUCENT;
+        }
+    }
+
+    private static final class BackdropBlurView extends View {
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+        private final Path clipPath = new Path();
+        private final RectF bounds = new RectF();
+        private final Drawable surface;
+        private final float cornerRadius;
+        private Bitmap bitmap;
+
+        BackdropBlurView(Context context, Drawable surface, float cornerRadius) {
+            super(context);
+            this.surface = surface;
+            this.cornerRadius = cornerRadius;
+        }
+
+        void setBitmap(Bitmap next) {
+            bitmap = next;
+            invalidate();
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            bounds.set(0f, 0f, getWidth(), getHeight());
+            clipPath.reset();
+            clipPath.addRoundRect(bounds, cornerRadius, cornerRadius, Path.Direction.CW);
+            int save = canvas.save();
+            canvas.clipPath(clipPath);
+            if (bitmap != null) {
+                canvas.drawBitmap(bitmap, null, bounds, paint);
+            }
+            surface.setBounds(0, 0, getWidth(), getHeight());
+            surface.draw(canvas);
+            canvas.restoreToCount(save);
         }
     }
 
