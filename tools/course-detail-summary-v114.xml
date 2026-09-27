@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto" android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingStart="20dp" android:paddingTop="8dp" android:paddingEnd="20dp" android:paddingBottom="16dp">
+    <com.google.android.material.textview.MaterialTextView android:id="@id/tv_item" android:layout_width="wrap_content" android:layout_height="wrap_content" android:visibility="gone" />
+    <androidx.appcompat.widget.AppCompatImageView android:id="@id/ib_delete" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
+    <androidx.appcompat.widget.LinearLayoutCompat android:id="@+id/detail_schedule_section" android:orientation="vertical" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_below="@id/tv_item">
+        <com.google.android.material.textview.MaterialTextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginBottom="8dp" android:text="上课安排" android:textColor="?attr/colorOnSurface" android:textSize="17sp" android:textStyle="bold" />
+        <com.google.android.material.card.MaterialCardView android:layout_width="match_parent" android:layout_height="wrap_content" app:cardBackgroundColor="@color/weeko_v114_detail_card" app:cardCornerRadius="16dp" app:cardElevation="0dp" app:strokeColor="@color/weeko_v114_detail_outline" app:strokeWidth="1dp">
+            <androidx.appcompat.widget.LinearLayoutCompat android:orientation="vertical" android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingStart="16dp" android:paddingTop="10dp" android:paddingEnd="16dp" android:paddingBottom="10dp">
+                <androidx.appcompat.widget.LinearLayoutCompat android:id="@id/ll_weeks" android:orientation="horizontal" android:gravity="center_vertical" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="40dp">
+                    <androidx.appcompat.widget.AppCompatImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_marginEnd="14dp" android:src="@drawable/weeko_v114_calendar" />
+                    <com.google.android.material.textview.MaterialTextView android:id="@id/et_weeks" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textColor="?attr/colorOnSurface" android:textSize="15sp" android:lines="1" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="12sp" android:autoSizeMaxTextSize="15sp" android:autoSizeStepGranularity="1sp" />
+                </androidx.appcompat.widget.LinearLayoutCompat>
+                <androidx.appcompat.widget.LinearLayoutCompat android:id="@id/ll_time" android:orientation="horizontal" android:gravity="center_vertical" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="40dp" android:layout_marginTop="4dp">
+                    <androidx.appcompat.widget.AppCompatImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_marginEnd="14dp" android:src="@drawable/weeko_v114_clock" />
+                    <com.google.android.material.textview.MaterialTextView android:id="@id/et_time" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textColor="?attr/colorOnSurface" android:textSize="15sp" android:lines="1" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="12sp" android:autoSizeMaxTextSize="15sp" android:autoSizeStepGranularity="1sp" />
+                    <com.google.android.material.checkbox.MaterialCheckBox android:id="@id/cb_own_time" android:layout_width="wrap_content" android:layout_height="wrap_content" android:visibility="gone" android:button="@null" android:hint="自定义时间" android:drawableEnd="?android:listChoiceIndicatorMultiple" />
+                </androidx.appcompat.widget.LinearLayoutCompat>
+                <androidx.appcompat.widget.LinearLayoutCompat android:id="@id/ll_own_time" android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content" android:visibility="gone">
+                    <com.google.android.material.button.MaterialButtonToggleGroup android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="8dp" app:selectionRequired="false">
+                        <com.google.android.material.button.MaterialButton android:id="@id/btn_start_time" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="上课时间" style="@style/Widget.Material3.Button.OutlinedButton" />
+                        <com.google.android.material.button.MaterialButton android:id="@id/btn_end_time" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="下课时间" android:checkable="false" style="@style/Widget.Material3.Button.OutlinedButton" />
+                    </com.google.android.material.button.MaterialButtonToggleGroup>
+                </androidx.appcompat.widget.LinearLayoutCompat>
+            </androidx.appcompat.widget.LinearLayoutCompat>
+        </com.google.android.material.card.MaterialCardView>
+    </androidx.appcompat.widget.LinearLayoutCompat>
+    <androidx.appcompat.widget.LinearLayoutCompat android:id="@+id/detail_info_section" android:orientation="vertical" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_below="@id/detail_schedule_section" android:layout_marginTop="16dp">
+        <com.google.android.material.textview.MaterialTextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginBottom="8dp" android:text="课程信息" android:textColor="?attr/colorOnSurface" android:textSize="17sp" android:textStyle="bold" />
+        <com.google.android.material.card.MaterialCardView android:layout_width="match_parent" android:layout_height="wrap_content" app:cardBackgroundColor="@color/weeko_v114_detail_card" app:cardCornerRadius="16dp" app:cardElevation="0dp" app:strokeColor="@color/weeko_v114_detail_outline" app:strokeWidth="1dp">
+            <androidx.appcompat.widget.LinearLayoutCompat android:orientation="vertical" android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingStart="16dp" android:paddingTop="8dp" android:paddingEnd="16dp" android:paddingBottom="8dp">
+                <androidx.appcompat.widget.LinearLayoutCompat android:id="@id/ll_teacher" android:orientation="horizontal" android:gravity="center_vertical" android:layout_width="match_parent" android:layout_height="44dp">
+                    <com.google.android.material.textview.MaterialTextView android:layout_width="88dp" android:layout_height="wrap_content" android:text="任课教师" android:textColor="?attr/colorOnSurfaceVariant" android:textSize="14sp" />
+                    <com.google.android.material.textview.MaterialTextView android:id="@id/et_teacher" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="start|center_vertical" android:textColor="?attr/colorOnSurface" android:textSize="15sp" android:singleLine="true" android:ellipsize="end" />
+                </androidx.appcompat.widget.LinearLayoutCompat>
+                <androidx.appcompat.widget.LinearLayoutCompat android:id="@id/ll_room" android:orientation="horizontal" android:gravity="center_vertical" android:layout_width="match_parent" android:layout_height="44dp">
+                    <com.google.android.material.textview.MaterialTextView android:layout_width="88dp" android:layout_height="wrap_content" android:text="上课地点" android:textColor="?attr/colorOnSurfaceVariant" android:textSize="14sp" />
+                    <com.google.android.material.textview.MaterialTextView android:id="@id/et_room" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="start|center_vertical" android:textColor="?attr/colorOnSurface" android:textSize="15sp" android:singleLine="true" android:ellipsize="end" />
+                </androidx.appcompat.widget.LinearLayoutCompat>
+                <androidx.appcompat.widget.LinearLayoutCompat android:id="@id/ll_note" android:orientation="horizontal" android:gravity="center_vertical" android:layout_width="match_parent" android:layout_height="40dp" android:visibility="gone">
+                    <com.google.android.material.textview.MaterialTextView android:layout_width="88dp" android:layout_height="wrap_content" android:text="备注" android:textColor="?attr/colorOnSurfaceVariant" android:textSize="14sp" />
+                    <com.google.android.material.textview.MaterialTextView android:id="@id/tv_note" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="start|center_vertical" android:textColor="?attr/colorOnSurface" android:textSize="15sp" android:singleLine="true" android:ellipsize="end" />
+                </androidx.appcompat.widget.LinearLayoutCompat>
+            </androidx.appcompat.widget.LinearLayoutCompat>
+        </com.google.android.material.card.MaterialCardView>
+    </androidx.appcompat.widget.LinearLayoutCompat>
+</RelativeLayout>

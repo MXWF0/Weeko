@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="WeekoPageMotionV114" parent="@android:style/Animation.Activity">
+        <item name="android:activityOpenEnterAnimation">@anim/weeko_page_open_enter_v114</item>
+        <item name="android:activityOpenExitAnimation">@anim/weeko_page_open_exit_v114</item>
+        <item name="android:activityCloseEnterAnimation">@anim/weeko_page_close_enter_v114</item>
+        <item name="android:activityCloseExitAnimation">@anim/weeko_page_close_exit_v114</item>
+    </style>
+    <style name="WeekoVaultBottomSheetV114" parent="@style/Theme.MaterialComponents.DayNight.BottomSheetDialog">
+        <item name="android:windowAnimationStyle">@style/WeekoVaultSheetMotionV114</item>
+    </style>
+    <style name="WeekoVaultSheetMotionV114">
+        <item name="android:windowEnterAnimation">@anim/weeko_vault_sheet_enter_v114</item>
+        <item name="android:windowExitAnimation">@anim/weeko_vault_sheet_exit_v114</item>
+    </style>
+</resources>

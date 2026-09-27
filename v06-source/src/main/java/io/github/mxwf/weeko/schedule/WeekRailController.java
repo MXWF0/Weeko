@@ -3,6 +3,7 @@ package io.github.mxwf.weeko.schedule;
 import android.animation.ValueAnimator;
 import android.content.Context;
 import android.content.res.Configuration;
+import android.content.res.TypedArray;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -38,8 +39,8 @@ public final class WeekRailController implements SeekBar.OnSeekBarChangeListener
     // The first weekday cell in each ViewPager page header.
     private static final int FIRST_WEEKDAY_HEADER_ID = 0x7f0900a2;
     private static final int BACKDROP_SCALE = 4;
-    private static final int BACKDROP_BLUR_RADIUS = 5;
-    private static final int BACKDROP_BLUR_PASSES = 3;
+    private static final int BACKDROP_BLUR_RADIUS = 4;
+    private static final int BACKDROP_BLUR_PASSES = 2;
     private static final int BLUE = 0xff2f80ff;
     private static final int LIGHT_SURFACE = 0xfff7faff;
     private static final int DARK_SURFACE = 0xff1c222b;
@@ -62,6 +63,7 @@ public final class WeekRailController implements SeekBar.OnSeekBarChangeListener
     private final int density;
     private ViewGroup rootParent;
     private boolean showing;
+    private boolean tracking;
     private boolean railPositioned;
     private int maxWeek;
     private int realWeek;
@@ -306,7 +308,7 @@ public final class WeekRailController implements SeekBar.OnSeekBarChangeListener
     }
 
     private void scheduleBackdropRefresh() {
-        if (!showing) {
+        if (!showing || tracking) {
             return;
         }
         removeBackdropCallbacks();
@@ -513,12 +515,15 @@ public final class WeekRailController implements SeekBar.OnSeekBarChangeListener
 
     @Override
     public void onStartTrackingTouch(SeekBar bar) {
+        tracking = true;
         removeHideCallbacks();
+        removeBackdropCallbacks();
         thumb.animateTo(true);
     }
 
     @Override
     public void onStopTrackingTouch(SeekBar bar) {
+        tracking = false;
         thumb.animateTo(false);
         scheduleBackdropRefresh();
         scheduleHide();
@@ -536,7 +541,16 @@ public final class WeekRailController implements SeekBar.OnSeekBarChangeListener
 
     private static GradientDrawable surfaceBackground(Context context, boolean dark) {
         GradientDrawable drawable = new GradientDrawable();
-        drawable.setColor(dark ? 0xd01c222b : 0xd0f7faff);
+        int surface = dark ? DARK_SURFACE : LIGHT_SURFACE;
+        if (context.getSharedPreferences("config", Context.MODE_PRIVATE)
+                .getBoolean("dynamic_colors", false)) {
+            int attr = context.getResources().getIdentifier(
+                    "colorSurface", "attr", context.getPackageName());
+            TypedArray themeColor = context.obtainStyledAttributes(new int[]{attr});
+            surface = themeColor.getColor(0, surface);
+            themeColor.recycle();
+        }
+        drawable.setColor((surface & 0x00ffffff) | (dark ? 0xc8000000 : 0xc0000000));
         drawable.setCornerRadius(18f * context.getResources().getDisplayMetrics().density);
         drawable.setStroke(1, dark ? 0x4a5e7192 : 0x3d5d7db5);
         return drawable;
