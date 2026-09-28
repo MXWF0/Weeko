@@ -15,6 +15,7 @@ import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
+import android.os.Build;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -25,6 +26,8 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
+
+import io.github.mxwf.weeko.theme.SoftDynamicColors;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -41,7 +44,7 @@ public final class WeekRailController implements SeekBar.OnSeekBarChangeListener
     private static final int BACKDROP_SCALE = 4;
     private static final int BACKDROP_BLUR_RADIUS = 4;
     private static final int BACKDROP_BLUR_PASSES = 2;
-    private static final int BLUE = 0xff2f80ff;
+    private static final int WEEKO_BLUE = 0xff2f80ff;
     private static final int LIGHT_SURFACE = 0xfff7faff;
     private static final int DARK_SURFACE = 0xff1c222b;
     private static final int LIGHT_PRIMARY = 0xff172238;
@@ -101,6 +104,7 @@ public final class WeekRailController implements SeekBar.OnSeekBarChangeListener
         this.context = rail.getContext();
         this.density = Math.max(1, (int) (context.getResources().getDisplayMetrics().density + 0.5f));
         boolean dark = isDark(context);
+        int accent = accentColor(context, dark);
 
         rail.setClipChildren(false);
         rail.setElevation(dp(2));
@@ -151,7 +155,7 @@ public final class WeekRailController implements SeekBar.OnSeekBarChangeListener
         row.addView(sliderHost, sliderHostParams);
 
         maxWeek = readMaxWeek();
-        overlay = new RailOverlay(context, dark ? 0xff7694c4 : 0xff7f9bc8, BLUE);
+        overlay = new RailOverlay(context, dark ? 0xff7694c4 : 0xff7f9bc8, accent);
         overlay.setMaxWeek(maxWeek);
         sliderHost.addView(overlay, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
@@ -162,9 +166,9 @@ public final class WeekRailController implements SeekBar.OnSeekBarChangeListener
         seekBar.setProgress(Math.max(0, readPageWeek() - 1));
         seekBar.setPadding(dp(4), 0, dp(4), 0);
         seekBar.setSplitTrack(false);
-        seekBar.setProgressDrawable(new RailTrackDrawable(BLUE,
+        seekBar.setProgressDrawable(new RailTrackDrawable(accent,
                 dark ? 0xff516079 : 0xffc6d3e6, dp(2)));
-        thumb = new RailThumbDrawable(BLUE, dp(5), dp(3));
+        thumb = new RailThumbDrawable(accent, dp(5), dp(3));
         seekBar.setThumb(thumb);
         seekBar.setContentDescription("拖动选择周次");
         seekBar.setOnSeekBarChangeListener(this);
@@ -177,10 +181,10 @@ public final class WeekRailController implements SeekBar.OnSeekBarChangeListener
         thisWeek.setTextSize(14f);
         thisWeek.setGravity(Gravity.CENTER);
         thisWeek.setSingleLine(true);
-        thisWeek.setTextColor(BLUE);
+        thisWeek.setTextColor(accent);
         thisWeek.setContentDescription("本周");
         thisWeek.setPadding(dp(8), 0, dp(8), 0);
-        thisWeek.setBackground(outlineBackground(context, BLUE, dark));
+        thisWeek.setBackground(outlineBackground(context, accent, dark));
         thisWeek.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -442,7 +446,7 @@ public final class WeekRailController implements SeekBar.OnSeekBarChangeListener
         if (week > maxWeek) {
             week = maxWeek;
         }
-        realWeek = calculateRealWeek();
+        realWeek = calculateRealWeek(maxWeek);
         seekBar.setMax(Math.max(0, maxWeek - 1));
         seekBar.setProgress(Math.max(0, week - 1));
         title.setText("第 " + week + " 周");
@@ -464,11 +468,11 @@ public final class WeekRailController implements SeekBar.OnSeekBarChangeListener
         return ((Integer) invokeNoArg(table, "getMaxWeek")).intValue();
     }
 
-    private int calculateRealWeek() {
+    private int calculateRealWeek(int maxWeek) {
         Object state = invokeNoArg(activity, "OooOo0o");
         Object table = invokeNoArg(state, "OooOO0o");
         String startDate = (String) invokeNoArg(table, "getStartDate");
-        return calculateCurrentWeek(startDate, readMaxWeek());
+        return calculateCurrentWeek(startDate, maxWeek);
     }
 
     private static int calculateCurrentWeek(String startDate, int maxWeek) {
@@ -539,17 +543,23 @@ public final class WeekRailController implements SeekBar.OnSeekBarChangeListener
         return mode == Configuration.UI_MODE_NIGHT_YES;
     }
 
+    private static int accentColor(Context context, boolean dark) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S
+                || !context.getSharedPreferences("config", Context.MODE_PRIVATE)
+                        .getBoolean("dynamic_colors", false)) {
+            return WEEKO_BLUE;
+        }
+        int attribute = context.getResources().getIdentifier(
+                "colorPrimary", "attr", context.getPackageName());
+        TypedArray themeColor = context.obtainStyledAttributes(new int[]{attribute});
+        int accent = SoftDynamicColors.softenPrimary(themeColor.getColor(0, WEEKO_BLUE), dark);
+        themeColor.recycle();
+        return accent;
+    }
+
     private static GradientDrawable surfaceBackground(Context context, boolean dark) {
         GradientDrawable drawable = new GradientDrawable();
         int surface = dark ? DARK_SURFACE : LIGHT_SURFACE;
-        if (context.getSharedPreferences("config", Context.MODE_PRIVATE)
-                .getBoolean("dynamic_colors", false)) {
-            int attr = context.getResources().getIdentifier(
-                    "colorSurface", "attr", context.getPackageName());
-            TypedArray themeColor = context.obtainStyledAttributes(new int[]{attr});
-            surface = themeColor.getColor(0, surface);
-            themeColor.recycle();
-        }
         drawable.setColor((surface & 0x00ffffff) | (dark ? 0xc8000000 : 0xc0000000));
         drawable.setCornerRadius(18f * context.getResources().getDisplayMetrics().density);
         drawable.setStroke(1, dark ? 0x4a5e7192 : 0x3d5d7db5);
@@ -565,9 +575,9 @@ public final class WeekRailController implements SeekBar.OnSeekBarChangeListener
 
     private static GradientDrawable outlineBackground(Context context, int color, boolean dark) {
         GradientDrawable drawable = new GradientDrawable();
-        drawable.setColor(dark ? 0x263e73c4 : 0x140f6fe8);
+        drawable.setColor((color & 0x00ffffff) | ((dark ? 0x26 : 0x14) << 24));
         drawable.setCornerRadius(18f * context.getResources().getDisplayMetrics().density);
-        drawable.setStroke(1, dark ? 0x997faeff : 0x667fb5ff);
+        drawable.setStroke(1, (color & 0x00ffffff) | ((dark ? 0x99 : 0x66) << 24));
         return drawable;
     }
 

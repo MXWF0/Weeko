@@ -97,7 +97,6 @@ Replace-V114ExactText "smali\com\suda\yzune\wakeupschedule\settings\OooOOO.smali
     sparse-switch v0, :sswitch_data_0
 '@
 
-Replace-V114ExactText "smali\com\suda\yzune\wakeupschedule\schedule\o0OOO0o.smali" '    const v1, 0x7f090049' '    const v1, 0x7f09004c'
 Replace-V114ExactText "smali\com\suda\yzune\wakeupschedule\schedule\o0OOO0o.smali" '    const v1, 0x7f1201ad' '    const/4 v1, 0x0'
 
 Replace-V114ExactText "apktool.yml" "  versionCode: 17`n  versionName: 1.1.3" "  versionCode: 18`n  versionName: 1.1.4"

@@ -2,6 +2,9 @@ package io.github.mxwf.weeko.vault;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
+import android.animation.AnimatorSet;
 import android.animation.ValueAnimator;
 import android.content.ClipData;
 import android.content.ClipboardManager;
@@ -27,12 +30,15 @@ import android.text.method.PasswordTransformationMethod;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.MotionEvent;
+import android.view.VelocityTracker;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowInsets;
 import android.view.WindowManager;
-import android.view.animation.DecelerateInterpolator;
+import android.view.animation.AnimationUtils;
+import android.view.animation.Interpolator;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
@@ -40,6 +46,8 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+
+import io.github.mxwf.weeko.theme.SoftDynamicColors;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -76,6 +84,22 @@ public final class PasswordVaultActivity extends Activity {
     private ScrollView recordScroll;
     private LinearLayout list;
     private TextView status;
+    private View scrim;
+    private Interpolator sheetInterpolator;
+    private AnimatorSet sheetAnimator;
+    private int maxBlurRadius;
+    private int lastBlurRadius = -1;
+    private float backdropFraction;
+    private float gestureDownX;
+    private float gestureDownY;
+    private float dragStartY;
+    private int dragStartOffset;
+    private int touchSlop;
+    private boolean dragCandidate;
+    private boolean sheetDragging;
+    private VelocityTracker dragVelocity;
+    private boolean sheetEntranceStarted;
+    private boolean sheetClosing;
     private boolean useDynamicColors;
     private final Map<String, Integer> resolvedColors = new HashMap<>();
 
@@ -88,8 +112,102 @@ public final class PasswordVaultActivity extends Activity {
 
     @Override
     public void finish() {
+        if (sheetClosing) return;
+        sheetClosing = true;
+        if (sheetRoot == null || sheetRoot.getHeight() == 0) {
+            finishImmediately();
+            return;
+        }
+        if (sheetAnimator != null) sheetAnimator.cancel();
+        animateSheetExit();
+    }
+
+    private void finishImmediately() {
+        Window window = getWindow();
+        WindowManager.LayoutParams attributes = window.getAttributes();
+        attributes.dimAmount = 0f;
+        if (scrim != null) scrim.setAlpha(0f);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            attributes.setBlurBehindRadius(0);
+            window.setBackgroundBlurRadius(0);
+            window.clearFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND);
+        }
+        window.setAttributes(attributes);
+        window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
         super.finish();
         overridePendingTransition(0, 0);
+    }
+
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent event) {
+        if (sheetRoot == null || sheetClosing || sheetRoot.getHeight() == 0) {
+            return super.dispatchTouchEvent(event);
+        }
+        switch (event.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN:
+                int[] sheetPosition = new int[2];
+                sheetRoot.getLocationOnScreen(sheetPosition);
+                dragCandidate = event.getRawY() >= sheetPosition[1]
+                        && event.getRawY() <= sheetPosition[1] + sheetRoot.getHeight();
+                sheetDragging = false;
+                if (dragCandidate) {
+                    gestureDownX = event.getRawX();
+                    gestureDownY = event.getRawY();
+                    dragVelocity = VelocityTracker.obtain();
+                    dragVelocity.addMovement(event);
+                }
+                break;
+            case MotionEvent.ACTION_MOVE:
+                if (dragCandidate) {
+                    dragVelocity.addMovement(event);
+                    float dy = event.getRawY() - gestureDownY;
+                    if (!sheetDragging && dy > touchSlop
+                            && dy > Math.abs(event.getRawX() - gestureDownX)
+                            && recordScroll.getScrollY() == 0) {
+                        sheetDragging = true;
+                        if (sheetAnimator != null) sheetAnimator.cancel();
+                        MotionEvent cancel = MotionEvent.obtain(event);
+                        cancel.setAction(MotionEvent.ACTION_CANCEL);
+                        super.dispatchTouchEvent(cancel);
+                        cancel.recycle();
+                        dragStartY = event.getRawY();
+                        dragStartOffset = Math.round(sheetRoot.getTranslationY());
+                        sheetRoot.setAlpha(1f);
+                    }
+                    if (sheetDragging) {
+                        applySheetOffset(dragStartOffset
+                                + Math.round(event.getRawY() - dragStartY));
+                        return true;
+                    }
+                }
+                break;
+            case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_CANCEL:
+                if (dragCandidate) {
+                    dragVelocity.addMovement(event);
+                    dragVelocity.computeCurrentVelocity(1000);
+                    float velocity = dragVelocity.getYVelocity();
+                    dragVelocity.recycle();
+                    dragVelocity = null;
+                    dragCandidate = false;
+                    if (sheetDragging) {
+                        sheetDragging = false;
+                        int offset = Math.round(sheetRoot.getTranslationY());
+                        if (event.getActionMasked() == MotionEvent.ACTION_UP
+                                && (offset > sheetHeight() * 0.25f
+                                || (offset > dp(16) && velocity > dp(400)))) {
+                            finish();
+                        } else {
+                            animateSheetRebound();
+                        }
+                        return true;
+                    }
+                }
+                break;
+            default:
+                break;
+        }
+        return super.dispatchTouchEvent(event);
     }
 
     @Override
@@ -156,55 +274,15 @@ public final class PasswordVaultActivity extends Activity {
             if (Build.VERSION.SDK_INT >= 34) {
                 String mode = dark ? "_dark" : "_light";
                 switch (name) {
-                    case "md_theme_onSurface":
-                        systemColor = "system_on_surface" + mode;
-                        break;
-                    case "md_theme_onSurfaceVariant":
-                    case "weeko_v114_detail_icon":
-                        systemColor = "system_on_surface_variant" + mode;
-                        break;
-                    case "weeko_v114_detail_sheet":
-                    case "weeko_v114_detail_navigation_bar":
-                        systemColor = "system_surface" + mode;
-                        break;
-                    case "weeko_v114_detail_card":
-                        systemColor = "system_surface_container_low" + mode;
-                        break;
-                    case "weeko_v114_detail_outline":
-                        systemColor = "system_outline_variant" + mode;
-                        break;
                     case "weeko_v114_detail_accent":
                         systemColor = "system_primary" + mode;
                         break;
                     case "weeko_v114_detail_accent_container":
                         systemColor = "system_primary_container" + mode;
                         break;
-                    case "weeko_v114_detail_danger":
-                        systemColor = "system_error" + mode;
-                        break;
-                    case "weeko_v114_detail_danger_container":
-                        systemColor = "system_error_container" + mode;
-                        break;
                 }
             } else {
                 switch (name) {
-                    case "md_theme_onSurface":
-                        systemColor = dark ? "system_neutral1_100" : "system_neutral1_900";
-                        break;
-                    case "md_theme_onSurfaceVariant":
-                    case "weeko_v114_detail_icon":
-                        systemColor = dark ? "system_neutral2_200" : "system_neutral2_700";
-                        break;
-                    case "weeko_v114_detail_sheet":
-                    case "weeko_v114_detail_navigation_bar":
-                        systemColor = dark ? "system_neutral2_900" : "system_neutral2_50";
-                        break;
-                    case "weeko_v114_detail_card":
-                        systemColor = dark ? "system_neutral2_900" : "system_neutral2_100";
-                        break;
-                    case "weeko_v114_detail_outline":
-                        systemColor = dark ? "system_neutral2_700" : "system_neutral2_200";
-                        break;
                     case "weeko_v114_detail_accent":
                         systemColor = dark ? "system_accent1_200" : "system_accent1_600";
                         break;
@@ -216,6 +294,10 @@ public final class PasswordVaultActivity extends Activity {
             if (systemColor != null) {
                 int systemColorId = getResources().getIdentifier(systemColor, "color", "android");
                 result = getResources().getColor(systemColorId);
+                if ("weeko_v114_detail_accent".equals(name)
+                        || "weeko_v114_detail_accent_container".equals(name)) {
+                    result = SoftDynamicColors.softenPrimary(result, dark);
+                }
             }
             if ("weeko_v114_detail_sheet".equals(name)
                     || "weeko_v114_detail_card".equals(name)
@@ -307,6 +389,7 @@ public final class PasswordVaultActivity extends Activity {
         root.setBackground(sheetBackground);
         root.setClipToOutline(true);
         root.setElevation(dp(8));
+        root.setAlpha(0f);
         root.setLayoutParams(new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM));
 
         FrameLayout handleArea = new FrameLayout(this);
@@ -315,28 +398,11 @@ public final class PasswordVaultActivity extends Activity {
         handleBackground.setColor(withAlpha(secondary, 0x66));
         handleBackground.setCornerRadius(dp(4));
         handle.setBackground(handleBackground);
-        FrameLayout.LayoutParams handleParams = new FrameLayout.LayoutParams(dp(44), dp(5), Gravity.CENTER);
+        FrameLayout.LayoutParams handleParams = new FrameLayout.LayoutParams(dp(36), dp(4), Gravity.CENTER);
         handleArea.addView(handle, handleParams);
         handleArea.setContentDescription("下滑关闭密码箱");
-        handleArea.setOnTouchListener(new View.OnTouchListener() {
-            private float downY;
-
-            @Override
-            public boolean onTouch(View view, MotionEvent event) {
-                if (event.getAction() == MotionEvent.ACTION_DOWN) {
-                    downY = event.getRawY();
-                    return true;
-                }
-                if (event.getAction() == MotionEvent.ACTION_UP) {
-                    if (event.getRawY() - downY > dp(56)) {
-                        finish();
-                    }
-                    return true;
-                }
-                return event.getAction() == MotionEvent.ACTION_MOVE || event.getAction() == MotionEvent.ACTION_CANCEL;
-            }
-        });
-        root.addView(handleArea, new LinearLayout.LayoutParams(-1, dp(28)));
+        handleArea.setClickable(true);
+        root.addView(handleArea, new LinearLayout.LayoutParams(-1, dp(20)));
 
         LinearLayout toolbar = new LinearLayout(this);
         toolbar.setGravity(Gravity.CENTER_VERTICAL);
@@ -371,7 +437,16 @@ public final class PasswordVaultActivity extends Activity {
         doneParams.setMargins(dp(18), dp(2), dp(18), dp(14));
         root.addView(done, doneParams);
 
-        setContentView(root);
+        FrameLayout overlay = new FrameLayout(this);
+        overlay.setClipChildren(false);
+        scrim = new View(this);
+        scrim.setBackgroundColor(Color.BLACK);
+        scrim.setAlpha(0f);
+        scrim.setOnClickListener(view -> finish());
+        overlay.addView(scrim, new FrameLayout.LayoutParams(-1, -1));
+        root.setClickable(true);
+        overlay.addView(root, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM));
+        setContentView(overlay);
         configureBottomSheet(root);
         renderRecords();
     }
@@ -379,12 +454,18 @@ public final class PasswordVaultActivity extends Activity {
     private void configureBottomSheet(View root) {
         Window window = getWindow();
         window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-        window.setGravity(Gravity.BOTTOM);
-        window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+        window.setGravity(Gravity.FILL);
+        window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
         WindowManager.LayoutParams attributes = window.getAttributes();
-        attributes.dimAmount = 0.38f;
+        attributes.dimAmount = 0f;
+        attributes.y = 0;
         window.setAttributes(attributes);
-        setFinishOnTouchOutside(true);
+        maxBlurRadius = dp(6);
+        touchSlop = ViewConfiguration.get(this).getScaledTouchSlop();
+        int emphasizedInterpolator = getResources().getIdentifier(
+                "m3_sys_motion_easing_emphasized", "interpolator", getPackageName());
+        sheetInterpolator = AnimationUtils.loadInterpolator(this, emphasizedInterpolator);
+        setFinishOnTouchOutside(false);
 
         window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION);
         window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
@@ -408,7 +489,7 @@ public final class PasswordVaultActivity extends Activity {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             window.setNavigationBarContrastEnforced(false);
         }
-        window.setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.WRAP_CONTENT);
+        window.setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT);
         root.setOnApplyWindowInsetsListener((view, insets) -> {
             int bottom = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
                     ? insets.getInsets(WindowInsets.Type.navigationBars()).bottom
@@ -423,19 +504,113 @@ public final class PasswordVaultActivity extends Activity {
             blurAttributes.setBlurBehindRadius(0);
             window.setAttributes(blurAttributes);
             window.setBackgroundBlurRadius(0);
-            root.postOnAnimation(() -> {
-                ValueAnimator blurAnimator = ValueAnimator.ofInt(0, dp(6));
-                blurAnimator.setDuration(250L);
-                blurAnimator.setInterpolator(new DecelerateInterpolator(2f));
-                blurAnimator.addUpdateListener(animation -> {
-                    int radius = (int) animation.getAnimatedValue();
-                    blurAttributes.setBlurBehindRadius(radius);
-                    window.setAttributes(blurAttributes);
-                    window.setBackgroundBlurRadius(radius);
-                });
-                blurAnimator.start();
-            });
         }
+    }
+
+    private int sheetHeight() {
+        return sheetRoot.getHeight() > 0 ? sheetRoot.getHeight() : sheetRoot.getMeasuredHeight();
+    }
+
+    private void applySheetOffset(int requestedOffset) {
+        int height = sheetHeight();
+        int offset = Math.max(0, Math.min(height, requestedOffset));
+        sheetRoot.setTranslationY(offset);
+        applyBackdrop(1f - offset / (float) height);
+    }
+
+    private void applyBackdrop(float fraction) {
+        backdropFraction = Math.max(0f, Math.min(1f, fraction));
+        scrim.setAlpha(0.32f * backdropFraction);
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return;
+        int radius = Math.round(maxBlurRadius * backdropFraction);
+        if (radius == lastBlurRadius) return;
+        lastBlurRadius = radius;
+        Window window = getWindow();
+        WindowManager.LayoutParams attributes = window.getAttributes();
+        attributes.setBlurBehindRadius(radius);
+        window.setAttributes(attributes);
+        window.setBackgroundBlurRadius(radius);
+    }
+
+    private void animateSheetEntrance() {
+        if (sheetClosing) return;
+        int startOffset = Math.round(sheetHeight() * 0.20000004f);
+        sheetRoot.setTranslationY(startOffset);
+        applyBackdrop(0f);
+        ValueAnimator progress = ValueAnimator.ofFloat(0f, 1f);
+        progress.setDuration(getResources().getInteger(getResources().getIdentifier(
+                "m3_sys_motion_duration_medium4", "integer", getPackageName())));
+        progress.setInterpolator(sheetInterpolator);
+        progress.addUpdateListener(animation -> {
+            float fraction = (float) animation.getAnimatedValue();
+            sheetRoot.setTranslationY(startOffset * (1f - fraction));
+            sheetRoot.setAlpha(fraction);
+            applyBackdrop(fraction);
+        });
+        sheetAnimator = new AnimatorSet();
+        sheetAnimator.play(progress);
+        sheetAnimator.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                if (sheetAnimator == animation) sheetAnimator = null;
+            }
+        });
+        sheetAnimator.start();
+    }
+
+    private void animateSheetRebound() {
+        if (sheetAnimator != null) sheetAnimator.cancel();
+        float startOffset = sheetRoot.getTranslationY();
+        float startAlpha = sheetRoot.getAlpha();
+        float startBackdrop = backdropFraction;
+        ValueAnimator progress = ValueAnimator.ofFloat(0f, 1f);
+        progress.setDuration(250L);
+        progress.setInterpolator(sheetInterpolator);
+        progress.addUpdateListener(animation -> {
+            float fraction = (float) animation.getAnimatedValue();
+            sheetRoot.setTranslationY(startOffset * (1f - fraction));
+            sheetRoot.setAlpha(startAlpha + (1f - startAlpha) * fraction);
+            applyBackdrop(startBackdrop + (1f - startBackdrop) * fraction);
+        });
+        sheetAnimator = new AnimatorSet();
+        sheetAnimator.play(progress);
+        sheetAnimator.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                if (sheetAnimator == animation) sheetAnimator = null;
+            }
+        });
+        sheetAnimator.start();
+    }
+
+    private void animateSheetExit() {
+        float startOffset = sheetRoot.getTranslationY();
+        int endOffset = sheetHeight();
+        float startBackdrop = backdropFraction;
+        ValueAnimator translation = ValueAnimator.ofFloat(0f, 1f);
+        translation.setDuration(getResources().getInteger(getResources().getIdentifier(
+                "m3_sys_motion_duration_medium3", "integer", getPackageName())));
+        translation.setInterpolator(sheetInterpolator);
+        translation.addUpdateListener(animation -> {
+            float fraction = (float) animation.getAnimatedValue();
+            sheetRoot.setTranslationY(startOffset + (endOffset - startOffset) * fraction);
+            applyBackdrop(startBackdrop * (1f - fraction));
+        });
+        ValueAnimator alpha = ValueAnimator.ofFloat(sheetRoot.getAlpha(), 0f);
+        alpha.setDuration(getResources().getInteger(getResources().getIdentifier(
+                "m3_sys_motion_duration_medium2", "integer", getPackageName())));
+        alpha.setInterpolator(sheetInterpolator);
+        alpha.addUpdateListener(animation -> sheetRoot.setAlpha((float) animation.getAnimatedValue()));
+        sheetAnimator = new AnimatorSet();
+        sheetAnimator.playTogether(translation, alpha);
+        sheetAnimator.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                if (sheetAnimator == animation) sheetAnimator = null;
+                finishImmediately();
+            }
+        });
+        sheetAnimator.start();
     }
 
     private void updateSheetHeight() {
@@ -452,7 +627,13 @@ public final class PasswordVaultActivity extends Activity {
                 scrollParams.height = maxHeight - naturalHeight + recordScroll.getMeasuredHeight();
                 recordScroll.setLayoutParams(scrollParams);
             }
-            getWindow().setLayout(WindowManager.LayoutParams.MATCH_PARENT, Math.min(naturalHeight, maxHeight));
+            FrameLayout.LayoutParams sheetParams = (FrameLayout.LayoutParams) sheetRoot.getLayoutParams();
+            sheetParams.height = Math.min(naturalHeight, maxHeight);
+            sheetRoot.setLayoutParams(sheetParams);
+            if (!sheetEntranceStarted) {
+                sheetEntranceStarted = true;
+                sheetRoot.post(this::animateSheetEntrance);
+            }
         });
     }
 

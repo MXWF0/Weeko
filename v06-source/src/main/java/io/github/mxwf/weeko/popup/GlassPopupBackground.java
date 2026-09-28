@@ -1,8 +1,6 @@
 package io.github.mxwf.weeko.popup;
 
 import android.content.res.Resources;
-import android.content.res.Configuration;
-import android.content.res.TypedArray;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Paint;
@@ -45,16 +43,6 @@ public final class GlassPopupBackground {
             sample.recycle();
             int tintId = resources.getIdentifier("weeko_v114_popup_glass", "color", content.getContext().getPackageName());
             int tint = resources.getColor(tintId);
-            if (content.getContext().getSharedPreferences("config", 0)
-                    .getBoolean("dynamic_colors", false)) {
-                int attr = resources.getIdentifier("colorSurface", "attr", content.getContext().getPackageName());
-                TypedArray themeColor = content.getContext().obtainStyledAttributes(new int[]{attr});
-                int surface = themeColor.getColor(0, tint);
-                themeColor.recycle();
-                boolean dark = (resources.getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)
-                        == Configuration.UI_MODE_NIGHT_YES;
-                tint = (surface & 0x00ffffff) | (dark ? 0xc4000000 : 0xb8000000);
-            }
             glassCanvas.drawColor(tint);
             content.setBackground(new BitmapDrawable(resources, glass));
         });
