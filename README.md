@@ -43,7 +43,7 @@ Weeko 是基于 WakeUp 6.0.23 行为母体维护的课程表项目。在保留�
 
 前往 [Releases](https://github.com/MXWF0/Weeko/releases) 下载最新 APK。
 
-- 当前稳定版：**v1.1.2**
+- 当前稳定版：**v1.1.4**
 
 ## 🗂 项目结构
 
