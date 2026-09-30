@@ -281,8 +281,8 @@ Replace-V114ExactText "smali\me\saket\cascade\OooOO0O.smali" `
 Replace-V114ExactText "smali\me\saket\cascade\OooOO0.smali" `
     "    invoke-virtual {v0, p0, v1, v4, v2}, Lme/saket/cascade/OooOO0O;->showAtLocation(Landroid/view/View;III)V`n`n    .line 81" `
     @'
+    invoke-static {p0, v0}, Lio/github/mxwf/weeko/popup/GlassPopupBackground;->applyTopBarMenu(Landroid/view/View;Landroid/widget/PopupWindow;)V
     invoke-virtual {v0, p0, v1, v4, v2}, Lme/saket/cascade/OooOO0O;->showAtLocation(Landroid/view/View;III)V
-    invoke-static {p0, v0}, Lio/github/mxwf/weeko/popup/GlassPopupBackground;->apply(Landroid/view/View;Landroid/widget/PopupWindow;)V
 
     .line 81
 '@

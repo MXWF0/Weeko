@@ -14,6 +14,78 @@ import android.widget.PopupWindow;
 public final class GlassPopupBackground {
     private GlassPopupBackground() {}
 
+    /** Cascade menus own their shadow; the toolbar and timetable remain untouched. */
+    public static void applyTopBarMenu(View anchor, PopupWindow popup) {
+        apply(anchor, popup);
+        View content = popup.getContentView();
+        popup.setElevation(6f * content.getResources().getDisplayMetrics().density);
+        content.post(() -> {
+            if (!popup.isShowing()) return;
+            float density = content.getResources().getDisplayMetrics().density;
+            boolean dark = (content.getResources().getConfiguration().uiMode
+                    & android.content.res.Configuration.UI_MODE_NIGHT_MASK)
+                    == android.content.res.Configuration.UI_MODE_NIGHT_YES;
+            float margin = 12f * density;
+            int width = content.getWidth(), height = content.getHeight();
+            Bitmap shade = Bitmap.createBitmap(Math.round((width + margin * 2f) / 2f),
+                    Math.round((height + margin * 2f) / 2f), Bitmap.Config.ARGB_8888);
+            Canvas shadeCanvas = new Canvas(shade);
+            shadeCanvas.scale(0.5f, 0.5f);
+            shadeCanvas.translate(margin, margin);
+            android.graphics.Paint shadowPaint = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+            shadowPaint.setColor(0xff000000);
+            shadowPaint.setStyle(android.graphics.Paint.Style.STROKE);
+            shadowPaint.setStrokeWidth(density);
+            shadowPaint.setShadowLayer(8f * density, 0f, 3f * density, dark ? 0x38000000 : 0x24000000);
+            shadeCanvas.drawRoundRect(0f, 0f, width, height, 20f * density, 20f * density, shadowPaint);
+            // Keep only the soft shadow: no filled silhouette or hard outline behind the glass.
+            shadowPaint.clearShadowLayer();
+            shadowPaint.setStrokeWidth(2f * density);
+            shadowPaint.setXfermode(new android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.CLEAR));
+            shadeCanvas.drawRoundRect(0f, 0f, width, height, 20f * density, 20f * density, shadowPaint);
+            android.graphics.Paint bitmapPaint = new android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG);
+            android.graphics.RectF shadeBounds = new android.graphics.RectF(content.getLeft() - margin,
+                    content.getTop() - margin, content.getLeft() + width + margin, content.getTop() + height + margin);
+            android.graphics.drawable.Drawable shadow = new android.graphics.drawable.Drawable() {
+                @Override public void draw(Canvas canvas) { canvas.drawBitmap(shade, null, shadeBounds, bitmapPaint); }
+                @Override public void setAlpha(int alpha) {}
+                @Override public void setColorFilter(android.graphics.ColorFilter filter) {}
+                @Override public int getOpacity() { return android.graphics.PixelFormat.TRANSLUCENT; }
+            };
+            content.setElevation(0f);
+            content.setClipToOutline(true);
+            View background = (View) content.getParent();
+            background.setBackground(shadow);
+            background.setElevation(0f);
+            background.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
+            ((android.view.ViewGroup) background.getParent()).setClipChildren(false);
+            android.view.ViewGroup menu = (android.view.ViewGroup) content;
+            for (int i = 0; i < menu.getChildCount(); i++) menuFeedback(menu.getChildAt(i), density);
+            popup.update();
+        });
+    }
+
+    private static void menuFeedback(View view, float density) {
+        if (view.isClickable() || view instanceof android.widget.AbsListView) {
+            int id = view.getResources().getIdentifier("weeko_v114_popup_item_pressed", "color",
+                    view.getContext().getPackageName());
+            int base = view.getResources().getColor(id);
+            int color = (base & 0xff000000) | (io.github.mxwf.weeko.theme.SoftDynamicColors
+                    .resolveAccent(view.getContext(), base) & 0x00ffffff);
+            android.graphics.drawable.RippleDrawable ripple = new android.graphics.drawable.RippleDrawable(
+                    android.content.res.ColorStateList.valueOf(color), null,
+                    new io.github.mxwf.weeko.about.G2ShapeDrawable(0xffffffff, 0, 0, 16f * density));
+            if (view instanceof android.widget.AbsListView) {
+                ((android.widget.AbsListView) view).setSelector(ripple);
+                ((android.widget.AbsListView) view).setDrawSelectorOnTop(true);
+            } else view.setBackground(ripple);
+        }
+        if (view instanceof android.view.ViewGroup) {
+            android.view.ViewGroup group = (android.view.ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) menuFeedback(group.getChildAt(i), density);
+        }
+    }
+
     public static void apply(View anchor, PopupWindow popup) {
         View content = popup.getContentView();
         content.post(() -> {
