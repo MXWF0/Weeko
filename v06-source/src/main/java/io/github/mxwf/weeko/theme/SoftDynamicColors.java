@@ -6,6 +6,7 @@ import android.content.res.ColorStateList;
 import android.content.res.TypedArray;
 import android.graphics.Color;
 import android.os.Build;
+import android.os.Parcel;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AbsSeekBar;
@@ -14,19 +15,9 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import java.lang.reflect.Method;
+import java.util.IdentityHashMap;
 
 public final class SoftDynamicColors {
-    private static final int[][] COLOR_STATES = {
-            {-android.R.attr.state_enabled},
-            {android.R.attr.state_enabled, android.R.attr.state_pressed},
-            {android.R.attr.state_enabled, android.R.attr.state_focused},
-            {android.R.attr.state_enabled, android.R.attr.state_checked},
-            {android.R.attr.state_enabled, android.R.attr.state_selected},
-            {android.R.attr.state_enabled, android.R.attr.state_activated},
-            {android.R.attr.state_enabled},
-            {}
-    };
-
     private SoftDynamicColors() {}
 
     public static int soften(int color) {
@@ -272,19 +263,38 @@ public final class SoftDynamicColors {
         if (source == null) {
             return null;
         }
-        int[] colors = new int[COLOR_STATES.length];
-        boolean changed = false;
-        for (int index = 0; index < COLOR_STATES.length; index++) {
-            int color = source.getColorForState(COLOR_STATES[index], source.getDefaultColor());
-            colors[index] = palette.soften(color);
-            changed |= colors[index] != color;
+        ColorStateList cached = palette.adjustedStates.get(source);
+        if (cached != null) return cached;
+        // Read the resolved platform parcel, preserving state order and combinations.
+        // AOSP ColorStateList.writeToParcel: count, state arrays, color array.
+        Parcel parcel = Parcel.obtain();
+        try {
+            source.writeToParcel(parcel, 0);
+            parcel.setDataPosition(0);
+            int[][] states = new int[parcel.readInt()][];
+            for (int index = 0; index < states.length; index++) {
+                states[index] = parcel.createIntArray();
+            }
+            int[] colors = parcel.createIntArray();
+            boolean changed = false;
+            for (int index = 0; index < colors.length; index++) {
+                int color = colors[index];
+                colors[index] = palette.soften(color);
+                changed |= colors[index] != color;
+            }
+            ColorStateList result = changed ? new ColorStateList(states, colors) : source;
+            palette.adjustedStates.put(source, result);
+            palette.adjustedStates.put(result, result);
+            return result;
+        } finally {
+            parcel.recycle();
         }
-        return changed ? new ColorStateList(COLOR_STATES, colors) : source;
     }
 
     private static final class Palette {
         private final int[] originals;
         private final int[] softened;
+        private final IdentityHashMap<ColorStateList, ColorStateList> adjustedStates = new IdentityHashMap<>();
 
         private Palette(Context context, boolean dark) {
             int primary = themeColor(context, "colorPrimary");

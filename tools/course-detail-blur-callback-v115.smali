@@ -3,7 +3,7 @@
 .source "SourceFile"
 
 .field private final window:Landroid/view/Window;
-.field private final fallbackView:Landroid/view/View;
+.field private final fallback:Lio/github/mxwf/weeko/popup/CourseDetailBlurFallbackV115;
 .field private final maxRadius:I
 .field private final maxDim:F
 .field private lastRadius:I
@@ -13,7 +13,9 @@
 
     invoke-direct {p0}, Ljava/lang/Object;-><init>()V
     iput-object p1, p0, Lcom/suda/yzune/wakeupschedule/schedule/CourseDetailGlassBlurCallbackV115;->window:Landroid/view/Window;
-    iput-object p2, p0, Lcom/suda/yzune/wakeupschedule/schedule/CourseDetailGlassBlurCallbackV115;->fallbackView:Landroid/view/View;
+    new-instance v0, Lio/github/mxwf/weeko/popup/CourseDetailBlurFallbackV115;
+    invoke-direct {v0, p2}, Lio/github/mxwf/weeko/popup/CourseDetailBlurFallbackV115;-><init>(Landroid/view/View;)V
+    iput-object v0, p0, Lcom/suda/yzune/wakeupschedule/schedule/CourseDetailGlassBlurCallbackV115;->fallback:Lio/github/mxwf/weeko/popup/CourseDetailBlurFallbackV115;
     iput p3, p0, Lcom/suda/yzune/wakeupschedule/schedule/CourseDetailGlassBlurCallbackV115;->maxRadius:I
     invoke-virtual {p1}, Landroid/view/Window;->getAttributes()Landroid/view/WindowManager$LayoutParams;
     move-result-object v0
@@ -69,8 +71,8 @@
     iput v0, p0, Lcom/suda/yzune/wakeupschedule/schedule/CourseDetailGlassBlurCallbackV115;->lastRadius:I
     iget-object v1, p0, Lcom/suda/yzune/wakeupschedule/schedule/CourseDetailGlassBlurCallbackV115;->window:Landroid/view/Window;
     invoke-virtual {v1, v0}, Landroid/view/Window;->setBackgroundBlurRadius(I)V
-    iget-object v1, p0, Lcom/suda/yzune/wakeupschedule/schedule/CourseDetailGlassBlurCallbackV115;->fallbackView:Landroid/view/View;
-    invoke-static {v1, v0}, Lio/github/mxwf/weeko/popup/CourseDetailBlurFallbackV115;->update(Landroid/view/View;I)V
+    iget-object v1, p0, Lcom/suda/yzune/wakeupschedule/schedule/CourseDetailGlassBlurCallbackV115;->fallback:Lio/github/mxwf/weeko/popup/CourseDetailBlurFallbackV115;
+    invoke-virtual {v1, v0}, Lio/github/mxwf/weeko/popup/CourseDetailBlurFallbackV115;->update(I)V
     iget-object v1, p0, Lcom/suda/yzune/wakeupschedule/schedule/CourseDetailGlassBlurCallbackV115;->window:Landroid/view/Window;
     invoke-virtual {v1}, Landroid/view/Window;->getAttributes()Landroid/view/WindowManager$LayoutParams;
     move-result-object v2
@@ -85,5 +87,12 @@
     invoke-virtual {v1, v2}, Landroid/view/Window;->setAttributes(Landroid/view/WindowManager$LayoutParams;)V
 
     :done
+    return-void
+.end method
+
+.method public close()V
+    .locals 1
+    iget-object v0, p0, Lcom/suda/yzune/wakeupschedule/schedule/CourseDetailGlassBlurCallbackV115;->fallback:Lio/github/mxwf/weeko/popup/CourseDetailBlurFallbackV115;
+    invoke-virtual {v0}, Lio/github/mxwf/weeko/popup/CourseDetailBlurFallbackV115;->close()V
     return-void
 .end method

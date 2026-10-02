@@ -23,6 +23,10 @@ local.properties
 *.png
 !assets/weeko-launcher.png
 *.webp
+!tools/assets/weeko-v115/weeko_launcher_art.webp
+!tools/assets/weeko-v115/weeko_launcher_foreground_art.webp
+!tools/assets/weeko-v115/weeko_launcher_monochrome_art.webp
+!tools/assets/weeko-v115/weeko_about_foreground.png
 *.jpg
 *.jpeg
 

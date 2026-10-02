@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="weeko_v114_detail_sheet">#B81A2431</color>
+    <color name="weeko_v114_detail_sheet">#B31A2431</color>
     <color name="weeko_v114_detail_navigation_bar">#FF1A2431</color>
-    <color name="weeko_v114_detail_card">#F927303C</color>
+    <color name="weeko_v114_detail_card">#B327303C</color>
     <color name="weeko_v114_detail_outline">#38445262</color>
-    <color name="weeko_v114_popup_glass">#C4233041</color>
+    <color name="weeko_v114_popup_glass">#B3233041</color>
     <color name="weeko_v114_popup_outline">#7595ACC9</color>
     <color name="weeko_v114_popup_item_pressed">#302E93FF</color>
     <color name="weeko_v114_detail_icon">#FFAAB6C8</color>

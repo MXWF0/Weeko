@@ -409,11 +409,30 @@ Replace-V115ExactText "smali\o000Oo0o.3\Oooo0.smali" @'
 
 $sheetPath = "smali\com\suda\yzune\wakeupschedule\schedule\CourseDetailBottomSheet.smali"
 Replace-V115ExactText $sheetPath @'
+    invoke-virtual {v8, v12}, Landroid/view/Window;->setNavigationBarColor(I)V
+'@ @'
+    invoke-virtual {v8, v12}, Landroid/view/Window;->setStatusBarColor(I)V
+    invoke-virtual {v8, v12}, Landroid/view/Window;->setNavigationBarColor(I)V
+'@
+Replace-V115ExactText $sheetPath @'
+    invoke-virtual {v8, v12}, Landroid/view/Window;->setNavigationBarContrastEnforced(Z)V
+'@ @'
+    invoke-virtual {v8, v12}, Landroid/view/Window;->setStatusBarContrastEnforced(Z)V
+    invoke-virtual {v8, v12}, Landroid/view/Window;->setNavigationBarContrastEnforced(Z)V
+'@
+Replace-V115ExactText $sheetPath @'
+    const/16 v10, 0x300
+    or-int/2addr v9, v10
+'@ @'
+    const/16 v10, 0x700
+    or-int/2addr v9, v10
+'@
+Replace-V115ExactText $sheetPath @'
 # instance fields
 .field public o00oO0O:Ljava/util/ArrayList;
 '@ @'
 # instance fields
-.field private weekoV115BlurFallbackView:Landroid/view/View;
+.field private weekoV115BlurCallback:Lcom/suda/yzune/wakeupschedule/schedule/CourseDetailGlassBlurCallbackV115;
 .field public o00oO0O:Ljava/util/ArrayList;
 '@
 Replace-V115ExactText $sheetPath @'
@@ -426,9 +445,9 @@ Replace-V115ExactText $sheetPath @'
     const v9, 0x01020002
     invoke-virtual {v11, v9}, Landroid/app/Activity;->findViewById(I)Landroid/view/View;
     move-result-object v11
-    iput-object v11, v12, Lcom/suda/yzune/wakeupschedule/schedule/CourseDetailBottomSheet;->weekoV115BlurFallbackView:Landroid/view/View;
     new-instance v14, Lcom/suda/yzune/wakeupschedule/schedule/CourseDetailGlassBlurCallbackV115;
     invoke-direct {v14, v10, v11, v13}, Lcom/suda/yzune/wakeupschedule/schedule/CourseDetailGlassBlurCallbackV115;-><init>(Landroid/view/Window;Landroid/view/View;I)V
+    iput-object v14, v12, Lcom/suda/yzune/wakeupschedule/schedule/CourseDetailBottomSheet;->weekoV115BlurCallback:Lcom/suda/yzune/wakeupschedule/schedule/CourseDetailGlassBlurCallbackV115;
 '@
 Replace-V115ExactText $sheetPath @'
     invoke-virtual {v1, v2}, Landroid/view/View;->setOnLongClickListener(Landroid/view/View$OnLongClickListener;)V
@@ -459,11 +478,11 @@ $sheetContent += @'
     .locals 2
 
     invoke-super {p0, p1}, Landroidx/fragment/app/o0OoOo0;->onDismiss(Landroid/content/DialogInterface;)V
-    iget-object v0, p0, Lcom/suda/yzune/wakeupschedule/schedule/CourseDetailBottomSheet;->weekoV115BlurFallbackView:Landroid/view/View;
+    iget-object v0, p0, Lcom/suda/yzune/wakeupschedule/schedule/CourseDetailBottomSheet;->weekoV115BlurCallback:Lcom/suda/yzune/wakeupschedule/schedule/CourseDetailGlassBlurCallbackV115;
     if-eqz v0, :weeko_v115_blur_clear_done
-    invoke-static {v0}, Lio/github/mxwf/weeko/popup/CourseDetailBlurFallbackV115;->clear(Landroid/view/View;)V
+    invoke-virtual {v0}, Lcom/suda/yzune/wakeupschedule/schedule/CourseDetailGlassBlurCallbackV115;->close()V
     const/4 v1, 0x0
-    iput-object v1, p0, Lcom/suda/yzune/wakeupschedule/schedule/CourseDetailBottomSheet;->weekoV115BlurFallbackView:Landroid/view/View;
+    iput-object v1, p0, Lcom/suda/yzune/wakeupschedule/schedule/CourseDetailBottomSheet;->weekoV115BlurCallback:Lcom/suda/yzune/wakeupschedule/schedule/CourseDetailGlassBlurCallbackV115;
     :weeko_v115_blur_clear_done
     return-void
 .end method
@@ -471,7 +490,47 @@ $sheetContent += @'
 [IO.File]::WriteAllText($sheetFullPath, $sheetContent, [Text.UTF8Encoding]::new($false))
 
 Copy-Item (Join-Path $PSScriptRoot "course-detail-blur-callback-v115.smali") (Join-Path $project "smali\com\suda\yzune\wakeupschedule\schedule\CourseDetailGlassBlurCallbackV115.smali") -Force
+$obsoleteBlur = Join-Path $project "smali\com\suda\yzune\wakeupschedule\schedule\CourseDetailGlassBlurCallbackV114.smali"
+$obsoleteBlurCallers = @(Get-ChildItem (Join-Path $project "smali") -Recurse -Filter "*.smali" |
+    Where-Object { $_.FullName -ne $obsoleteBlur } | Select-String -SimpleMatch "CourseDetailGlassBlurCallbackV114")
+if ($obsoleteBlurCallers.Count -ne 0) { throw "Old blur callback still has callers" }
+Remove-Item -LiteralPath $obsoleteBlur -Force
 Write-Output "Applied Weeko v1.1.5 progressive blur fallback and softened dynamic colors to $project"
+
+# All in-process AppCompat alert dialogs share this lifecycle. System dialogs do not.
+Replace-V115ExactText "smali\androidx\fragment\app\o0OoOo0.smali" @'
+    invoke-virtual {v0}, Landroid/app/Dialog;->show()V
+'@ @'
+    invoke-virtual {v0}, Landroid/app/Dialog;->show()V
+    invoke-static {v0}, Lio/github/mxwf/weeko/popup/GlassDialogSurface;->applyFragment(Landroid/app/Dialog;)V
+'@
+Replace-V115ExactText "smali\o000OOO\OooO.smali" @'
+.method public final onStart()V
+    .locals 3
+'@ @'
+.method public final onStart()V
+    .locals 3
+    invoke-static {p0}, Lio/github/mxwf/weeko/popup/GlassDialogSurface;->applySheet(Landroid/app/Dialog;)V
+'@
+$alertPath = "smali\androidx\appcompat\app\OooOOO.smali"
+Replace-V115ExactText $alertPath @'
+# virtual methods
+'@ @'
+# virtual methods
+.method protected onStart()V
+    .locals 0
+    invoke-super {p0}, Landroidx/appcompat/app/o00000OO;->onStart()V
+    invoke-static {p0}, Lio/github/mxwf/weeko/popup/GlassDialogSurface;->apply(Landroid/app/Dialog;)V
+    return-void
+.end method
+
+'@
+Replace-V115ExactText "smali\androidx\appcompat\widget\ListPopupWindow.smali" @'
+    invoke-virtual {v4, v0, v2, v3, v5}, Landroid/widget/PopupWindow;->showAsDropDown(Landroid/view/View;III)V
+'@ @'
+    invoke-virtual {v4, v0, v2, v3, v5}, Landroid/widget/PopupWindow;->showAsDropDown(Landroid/view/View;III)V
+    invoke-static {v0, v4}, Lio/github/mxwf/weeko/popup/GlassPopupBackground;->apply(Landroid/view/View;Landroid/widget/PopupWindow;)V
+'@
 
 $manifestPath = "AndroidManifest.xml"
 Replace-V115RegexText $manifestPath '(?m)^[\t ]*<activity\b(?=[^\r\n]*android:name="com\.suda\.yzune\.wakeupschedule\.clock\.ClockActivity")[^\r\n]*/>[\t ]*\r?\n?' ""
@@ -637,3 +696,92 @@ foreach ($vaultAnimation in @("weeko_vault_sheet_enter_v114.xml", "weeko_vault_s
 }
 
 Write-Output "Removed campus-life and course-clock features from the v1.1.5 replay while retaining shared course and Material time-picker code."
+
+Replace-V115ExactText "smali\com\skydoves\balloon\OooOOOO.smali" `
+    '    invoke-virtual {v1, v3, v4, v0}, Landroid/widget/PopupWindow;->showAsDropDown(Landroid/view/View;II)V' `
+    @'
+    invoke-virtual {v1, v3, v4, v0}, Landroid/widget/PopupWindow;->showAsDropDown(Landroid/view/View;II)V
+    invoke-static {v3, v1}, Lio/github/mxwf/weeko/popup/GlassPopupBackground;->applyHint(Landroid/view/View;Landroid/widget/PopupWindow;)V
+'@
+
+# Lossless, pixel-identical artwork; keep resource names and every icon/splash reference.
+# One page-motion policy for Activity windows, covering Settings activities and NavHost pages.
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot "weeko-detail-edit-v115.xml") -Destination (Join-Path $project "res\drawable\weeko_detail_edit_v115.xml") -Force
+Replace-V115ExactText "res\menu\course_detail_menu.xml" '@drawable/ic_twotone_edit_24' '@drawable/weeko_detail_edit_v115'
+Replace-V115ExactText "res\menu\course_detail_menu.xml" ' app:iconTint="?attr/colorOnSurface"' ''
+
+foreach ($motion in @(
+    @("enter", "open_enter", "enter"),
+    @("underlay-exit", "open_exit", "exit"),
+    @("underlay-enter", "close_enter", "pop_enter"),
+    @("exit", "close_exit", "pop_exit")
+)) {
+    $sourceMotion = Join-Path $PSScriptRoot "weeko-layered-page-$($motion[0])-v115.xml"
+    Copy-Item -LiteralPath $sourceMotion -Destination (Join-Path $project "res\anim\nav_default_$($motion[2])_anim.xml") -Force
+    foreach ($alias in @("weeko_page_$($motion[1])_v114", "weeko_settings_cover_$($motion[0].Replace('-', '_'))_v114")) {
+        Copy-Item -LiteralPath (Join-Path $PSScriptRoot "weeko-layered-window-none-v115.xml") -Destination (Join-Path $project "res\anim\$alias.xml") -Force
+    }
+}
+
+Replace-V115ExactText "smali\com\suda\yzune\wakeupschedule\App.smali" `
+    '    invoke-super {p0}, Landroid/app/Application;->onCreate()V' `
+    @'
+    invoke-super {p0}, Landroid/app/Application;->onCreate()V
+    invoke-static {p0}, Lio/github/mxwf/weeko/navigation/LayeredPageTransition;->install(Landroid/app/Application;)V
+'@
+
+$pageLaunchFiles = Get-ChildItem -LiteralPath (Join-Path $project "smali\com\suda\yzune\wakeupschedule") -Recurse -File -Filter "*.smali"
+foreach ($launchFile in $pageLaunchFiles) {
+    $launchText = [IO.File]::ReadAllText($launchFile.FullName)
+    $launchText = [regex]::Replace($launchText,
+        'invoke-virtual \{([vp]\d+), ([vp]\d+)\}, Landroid/content/Context;->startActivity\(Landroid/content/Intent;\)V',
+        'invoke-static {$1, $2}, Lio/github/mxwf/weeko/navigation/LayeredPageTransition;->start(Landroid/content/Context;Landroid/content/Intent;)V')
+    [IO.File]::WriteAllText($launchFile.FullName, $launchText, [Text.UTF8Encoding]::new($false))
+}
+Replace-V115ExactText "smali\androidx\activity\OooO.smali" `
+    '    invoke-virtual {v0, p2, v2, v7}, Landroid/app/Activity;->startActivityForResult(Landroid/content/Intent;ILandroid/os/Bundle;)V' `
+    '    invoke-static {v0, p2, v2, v7}, Lio/github/mxwf/weeko/navigation/LayeredPageTransition;->startForResult(Landroid/app/Activity;Landroid/content/Intent;ILandroid/os/Bundle;)V'
+
+# Finish the shared in-window return before closing its Activity. No per-page override.
+$componentActivityPath = Join-Path $project "smali\androidx\activity\ComponentActivity.smali"
+$componentActivity = [IO.File]::ReadAllText($componentActivityPath)
+if ($componentActivity.Contains('.method public finish()V')) { throw "ComponentActivity already defines finish; review its implementation" }
+$componentActivity += @'
+
+.method public finish()V
+    .locals 1
+    invoke-static {p0}, Lio/github/mxwf/weeko/navigation/LayeredPageTransition;->finish(Landroid/app/Activity;)Z
+    move-result v0
+    if-eqz v0, :weeko_finish_now
+    return-void
+    :weeko_finish_now
+    invoke-super {p0}, Landroidx/core/app/ComponentActivity;->finish()V
+    return-void
+.end method
+'@
+[IO.File]::WriteAllText($componentActivityPath, $componentActivity, [Text.UTF8Encoding]::new($false))
+
+# The shared Fragment animation loader already knows the operation's owning view.
+$fragmentLoaderPath = Join-Path $project "smali\androidx\fragment\app\OooOO0.smali"
+$fragmentLoader = [IO.File]::ReadAllText($fragmentLoaderPath)
+$oldLoad = '    invoke-static {p1, v2}, Landroid/view/animation/AnimationUtils;->loadAnimation(Landroid/content/Context;I)Landroid/view/animation/Animation;'
+if ([regex]::Matches($fragmentLoader, [regex]::Escape($oldLoad)).Count -ne 2) { throw "Expected both Fragment animation-loading paths" }
+$newLoad = @'
+    iget-object v1, p0, LOooOO0/OooO;->OooO0oo:Ljava/lang/Object;
+    check-cast v1, Landroidx/fragment/app/o000OO00;
+    iget-object v1, v1, Landroidx/fragment/app/o000OO00;->OooO0OO:Landroidx/fragment/app/oo0o0Oo;
+    iget-object v1, v1, Landroidx/fragment/app/oo0o0Oo;->Oooo0o0:Landroid/view/View;
+    invoke-static {p1, v2, v1}, Lio/github/mxwf/weeko/navigation/LayeredPageTransition;->load(Landroid/content/Context;ILandroid/view/View;)Landroid/view/animation/Animation;
+'@
+$fragmentLoader = $fragmentLoader.Replace($oldLoad, $newLoad)
+[IO.File]::WriteAllText($fragmentLoaderPath, $fragmentLoader, [Text.UTF8Encoding]::new($false))
+
+foreach ($artName in @("weeko_launcher_art", "weeko_launcher_foreground_art", "weeko_launcher_monochrome_art")) {
+    $artDirectory = Join-Path $project "res\drawable-nodpi"
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot "assets\weeko-v115\$artName.webp") -Destination (Join-Path $artDirectory "$artName.webp") -Force
+    Remove-Item -LiteralPath (Join-Path $artDirectory "$artName.png") -Force
+}
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot "assets\weeko-v115\weeko_about_foreground.png") -Destination (Join-Path $project "res\drawable-nodpi\weeko_about_foreground.png") -Force
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot "weeko-popup-window-animations-v115.xml") -Destination (Join-Path $project "res\values\weeko_popup_window_animations_v115.xml") -Force
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot "weeko-popup-window-exit-v115.xml") -Destination (Join-Path $project "res\anim\weeko_popup_window_exit_v115.xml") -Force
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot "weeko-layered-window-hold-v115.xml") -Destination (Join-Path $project "res\anim\weeko_layered_window_hold_v115.xml") -Force

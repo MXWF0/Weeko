@@ -2,6 +2,7 @@ package io.github.mxwf.weeko.about;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import io.github.mxwf.weeko.popup.GlassDialogSurface;
 import android.content.ActivityNotFoundException;
 import android.content.ClipData;
 import android.content.ClipboardManager;
@@ -12,11 +13,14 @@ import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.Color;
+import android.graphics.drawable.AdaptiveIconDrawable;
+import android.graphics.drawable.BitmapDrawable;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Trace;
 import android.text.TextUtils;
 import android.util.TypedValue;
 import android.view.Gravity;
@@ -49,6 +53,7 @@ public final class WeekoAboutActivity extends Activity {
     }
 
     private TextView label(String value, float size, int color, boolean bold) {
+        Trace.beginSection("Weeko.about.label");
         TextView view = new TextView(this);
         view.setText(value);
         view.setTextSize(TypedValue.COMPLEX_UNIT_SP, size);
@@ -59,6 +64,7 @@ public final class WeekoAboutActivity extends Activity {
         } else {
             view.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
         }
+        Trace.endSection();
         return view;
     }
 
@@ -79,7 +85,9 @@ public final class WeekoAboutActivity extends Activity {
         card.addView(heading, new LinearLayout.LayoutParams(-1, -2));
         TextView content = label(body, 16f, secondary, false);
         content.setPadding(0, dp(8), 0, 0);
+        Trace.beginSection("Weeko.about.selectable");
         content.setTextIsSelectable(true);
+        Trace.endSection();
         card.addView(content, new LinearLayout.LayoutParams(-1, -2));
         return card;
     }
@@ -91,6 +99,7 @@ public final class WeekoAboutActivity extends Activity {
     }
 
     private Button actionButton(String text, int textColor, int backgroundColor) {
+        Trace.beginSection("Weeko.about.button");
         Button button = new Button(this);
         button.setText(text);
         button.setTextColor(textColor);
@@ -101,6 +110,7 @@ public final class WeekoAboutActivity extends Activity {
         background.setColor(backgroundColor);
         background.setCornerRadius(dp(12));
         button.setBackground(background);
+        Trace.endSection();
         return button;
     }
 
@@ -137,6 +147,7 @@ public final class WeekoAboutActivity extends Activity {
                     clipboard.setPrimaryClip(ClipData.newPlainText("Weeko 联系邮箱", "mxwfwdw@outlook.com"));
                 }));
         dialog.show();
+        GlassDialogSurface.apply(dialog);
     }
 
     private String versionName() {
@@ -152,11 +163,10 @@ public final class WeekoAboutActivity extends Activity {
         try {
             startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
         } catch (ActivityNotFoundException exception) {
-            new AlertDialog.Builder(this)
+            GlassDialogSurface.show(new AlertDialog.Builder(this)
                     .setTitle("无法打开链接")
                     .setMessage("设备上没有可处理此链接的应用。")
-                    .setPositiveButton("关闭", null)
-                    .show();
+                    .setPositiveButton("关闭", null));
         }
     }
 
@@ -179,11 +189,10 @@ public final class WeekoAboutActivity extends Activity {
                 if (isFinishing() || isDestroyed()) return;
                 trigger.setEnabled(true);
                 trigger.setText(originalText);
-                new AlertDialog.Builder(WeekoAboutActivity.this)
+                GlassDialogSurface.show(new AlertDialog.Builder(WeekoAboutActivity.this)
                         .setTitle("检查更新失败")
                         .setMessage(message)
-                        .setPositiveButton("关闭", null)
-                        .show();
+                        .setPositiveButton("关闭", null));
             }
         });
     }
@@ -206,12 +215,14 @@ public final class WeekoAboutActivity extends Activity {
         if (result.updateAvailable) {
             dialog.setPositiveButton("下载 APK", (ignored, which) -> openUrl(result.assetUrl));
         }
-        dialog.show();
+        GlassDialogSurface.show(dialog);
     }
 
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
+
+        Trace.beginSection("Weeko.about.palette");
 
         boolean systemDark = (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)
                 == Configuration.UI_MODE_NIGHT_YES;
@@ -228,6 +239,7 @@ public final class WeekoAboutActivity extends Activity {
         int secondary = color("md_theme_onSurfaceVariant");
         int blue = color("md_theme_primary");
         int buttonSurface = color("md_theme_surfaceContainerHigh");
+        Trace.endSection();
 
         getWindow().setStatusBarColor(background);
         getWindow().setNavigationBarColor(background);
@@ -283,7 +295,18 @@ public final class WeekoAboutActivity extends Activity {
         content.setPadding(dp(16), dp(12), dp(16), dp(24));
 
         ImageView icon = new ImageView(this);
-        icon.setImageResource(getResources().getIdentifier("ic_launcher", "mipmap", getPackageName()));
+        Trace.beginSection("Weeko.about.icon");
+        if (Build.VERSION.SDK_INT >= 26) {
+            // A display-sized build asset avoids decoding launcher-sized artwork on entry.
+            BitmapDrawable foreground = (BitmapDrawable) getDrawable(getResources().getIdentifier(
+                    "weeko_about_foreground", "drawable", getPackageName()));
+            foreground.setGravity(Gravity.FILL);
+            icon.setImageDrawable(new AdaptiveIconDrawable(getDrawable(getResources().getIdentifier(
+                    "ic_launcher_background", "drawable", getPackageName())), foreground));
+        } else {
+            icon.setImageResource(getResources().getIdentifier("ic_launcher", "mipmap", getPackageName()));
+        }
+        Trace.endSection();
         icon.setContentDescription("Weeko 课程表");
         LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(dp(96), dp(96));
         iconParams.gravity = Gravity.CENTER_HORIZONTAL;

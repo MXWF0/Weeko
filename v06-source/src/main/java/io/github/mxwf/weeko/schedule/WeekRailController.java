@@ -63,7 +63,7 @@ public final class WeekRailController implements SeekBar.OnSeekBarChangeListener
     private final RailThumbDrawable thumb;
     private final RailOverlay overlay;
     private final BackdropBlurView backdrop;
-    private final int density;
+    private final float density;
     private ViewGroup rootParent;
     private boolean showing;
     private boolean tracking;
@@ -102,7 +102,7 @@ public final class WeekRailController implements SeekBar.OnSeekBarChangeListener
         this.activity = activity;
         this.dateViews = dateViews;
         this.context = rail.getContext();
-        this.density = Math.max(1, (int) (context.getResources().getDisplayMetrics().density + 0.5f));
+        this.density = context.getResources().getDisplayMetrics().density;
         boolean dark = isDark(context);
         int accent = accentColor(context, dark);
 
@@ -534,7 +534,7 @@ public final class WeekRailController implements SeekBar.OnSeekBarChangeListener
     }
 
     private int dp(int value) {
-        return value * density;
+        return Math.round(value * density);
     }
 
     private static boolean isDark(Context context) {

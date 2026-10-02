@@ -48,6 +48,9 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 
 import io.github.mxwf.weeko.theme.SoftDynamicColors;
+import io.github.mxwf.weeko.about.G2ShapeDrawable;
+import io.github.mxwf.weeko.popup.GlassDialogSurface;
+import io.github.mxwf.weeko.popup.CourseDetailG2SheetDrawableV114;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -334,11 +337,10 @@ public final class PasswordVaultActivity extends Activity {
     }
 
     private void styleButton(Button button, int background, int foreground, int cornerRadius, int elevation) {
-        GradientDrawable shape = new GradientDrawable();
-        shape.setColor(background);
-        shape.setCornerRadius(dp(cornerRadius));
+        G2ShapeDrawable shape = new G2ShapeDrawable(background, 0, 0, dp(cornerRadius));
+        G2ShapeDrawable mask = new G2ShapeDrawable(Color.WHITE, 0, 0, dp(cornerRadius));
         button.setBackground(new RippleDrawable(
-                ColorStateList.valueOf(withAlpha(foreground, 0x28)), shape, null));
+                ColorStateList.valueOf(withAlpha(foreground, 0x28)), shape, mask));
         button.setTextColor(foreground);
         button.setStateListAnimator(null);
         button.setElevation(dp(elevation));
@@ -349,23 +351,12 @@ public final class PasswordVaultActivity extends Activity {
                 getResources().getIdentifier(drawableName, "drawable", getPackageName())).mutate();
         icon.setTint(tint);
         button.setCompoundDrawablesWithIntrinsicBounds(icon, null, null, null);
+        button.setCompoundDrawableTintList(ColorStateList.valueOf(tint));
         button.setCompoundDrawablePadding(dp(6));
     }
 
     private void styleDialog(AlertDialog dialog, boolean destructive) {
-        GradientDrawable background = new GradientDrawable();
-        background.setColor(color("weeko_v114_detail_sheet"));
-        background.setCornerRadius(dp(24));
-        background.setStroke(dp(1), color("weeko_v114_detail_outline"));
-        Window window = dialog.getWindow();
-        window.setBackgroundDrawable(background);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            window.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND);
-            WindowManager.LayoutParams blurAttributes = window.getAttributes();
-            blurAttributes.setBlurBehindRadius(dp(6));
-            window.setAttributes(blurAttributes);
-            window.setBackgroundBlurRadius(dp(6));
-        }
+        GlassDialogSurface.apply(dialog);
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(color(
                 destructive ? "weeko_v114_detail_danger" : "weeko_v114_detail_accent"));
         Button cancel = dialog.getButton(AlertDialog.BUTTON_NEGATIVE);
@@ -382,13 +373,9 @@ public final class PasswordVaultActivity extends Activity {
         LinearLayout root = new LinearLayout(this);
         sheetRoot = root;
         root.setOrientation(LinearLayout.VERTICAL);
-        GradientDrawable sheetBackground = new GradientDrawable();
-        sheetBackground.setColor(withAlpha(color("weeko_v114_detail_sheet"), 0xd0));
-        sheetBackground.setCornerRadii(new float[]{dp(28), dp(28), dp(28), dp(28), 0, 0, 0, 0});
-        sheetBackground.setStroke(dp(1), color("weeko_v114_detail_outline"));
-        root.setBackground(sheetBackground);
+        root.setBackground(new CourseDetailG2SheetDrawableV114(this));
         root.setClipToOutline(true);
-        root.setElevation(dp(8));
+        root.setElevation(0f);
         root.setAlpha(0f);
         root.setLayoutParams(new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM));
 
@@ -469,24 +456,37 @@ public final class PasswordVaultActivity extends Activity {
 
         window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION);
         window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+        window.addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN);
+        window.setStatusBarColor(Color.TRANSPARENT);
         window.setNavigationBarColor(color("weeko_v114_detail_navigation_bar"));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.setDecorFitsSystemWindows(false);
+            WindowManager.LayoutParams edgeAttributes = window.getAttributes();
+            edgeAttributes.setFitInsetsTypes(0);
+            edgeAttributes.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
+            window.setAttributes(edgeAttributes);
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             View decor = window.getDecorView();
             int flags = decor.getSystemUiVisibility();
             if ((getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)
                     == Configuration.UI_MODE_NIGHT_YES) {
                 flags &= ~View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+                flags &= ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
             } else {
                 flags |= View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+                flags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
             }
             decor.setSystemUiVisibility(flags | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                    | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
+                    | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
         } else {
             View decor = window.getDecorView();
             decor.setSystemUiVisibility(decor.getSystemUiVisibility()
-                    | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
+                    | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                    | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.setStatusBarContrastEnforced(false);
             window.setNavigationBarContrastEnforced(false);
         }
         window.setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT);
@@ -529,7 +529,6 @@ public final class PasswordVaultActivity extends Activity {
         WindowManager.LayoutParams attributes = window.getAttributes();
         attributes.setBlurBehindRadius(radius);
         window.setAttributes(attributes);
-        window.setBackgroundBlurRadius(radius);
     }
 
     private void animateSheetEntrance() {
@@ -685,10 +684,8 @@ public final class PasswordVaultActivity extends Activity {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setPadding(dp(16), dp(14), dp(16), dp(12));
-        GradientDrawable background = new GradientDrawable();
-        background.setColor(withAlpha(color("weeko_v114_detail_card"), 0xd4));
-        background.setCornerRadius(dp(18));
-        background.setStroke(dp(1), color("weeko_v114_detail_outline"));
+        G2ShapeDrawable background = new G2ShapeDrawable(color("weeko_v114_detail_card"),
+                color("weeko_v114_detail_outline"), dp(0.5f), dp(16));
         card.setBackground(background);
 
         String displayName = record.username;
@@ -819,13 +816,13 @@ public final class PasswordVaultActivity extends Activity {
                             usernameValue,
                             passwordValue,
                             notes.getText().toString().trim());
+                    List<Record> candidate = new ArrayList<>(records);
                     if (existing == null) {
-                        records.add(changed);
+                        candidate.add(changed);
                     } else {
-                        records.set(records.indexOf(existing), changed);
+                        candidate.set(records.indexOf(existing), changed);
                     }
-                    persistAndRender();
-                    dialog.dismiss();
+                    if (persistAndRender(candidate)) dialog.dismiss();
                 }));
         dialog.show();
         styleDialog(dialog, false);
@@ -837,19 +834,24 @@ public final class PasswordVaultActivity extends Activity {
                 .setMessage("确定删除“" + record.username + "”？")
                 .setNegativeButton("取消", null)
                 .setPositiveButton("删除", (dialog, which) -> {
-                    records.remove(record);
-                    persistAndRender();
+                    List<Record> candidate = new ArrayList<>(records);
+                    candidate.remove(record);
+                    persistAndRender(candidate);
                 })
                 .show();
         styleDialog(confirmDialog, true);
     }
 
-    private void persistAndRender() {
+    private boolean persistAndRender(List<Record> candidate) {
         try {
-            writeRecords(records);
+            writeRecords(candidate);
+            records.clear();
+            records.addAll(candidate);
             renderRecords();
+            return true;
         } catch (IOException | GeneralSecurityException | JSONException exception) {
             showStorageError(exception);
+            return false;
         }
     }
 
