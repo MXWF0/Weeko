@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto" android:tag="weeko_add_detail" android:orientation="vertical" android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingTop="16dp" android:paddingBottom="16dp">
+    <TextView android:tag="weeko_time_title" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginStart="16dp" android:layout_marginEnd="16dp" android:text="时间安排" android:textSize="18sp" android:fontFamily="sans-serif-medium" android:textColor="?attr/colorOnSurface" android:layout_marginBottom="16dp" />
+    <LinearLayout android:tag="weeko_time_group" android:orientation="vertical" android:padding="12dp" android:layout_width="match_parent" android:layout_height="wrap_content">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical">
+            <com.google.android.material.textview.MaterialTextView android:id="@id/tv_item" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="时间段" android:textSize="15sp" android:fontFamily="sans-serif-medium" android:textColor="?attr/colorPrimary" />
+            <androidx.appcompat.widget.AppCompatImageView android:id="@id/ib_delete" android:tag="weeko_action" android:contentDescription="删除此时间段" android:layout_width="48dp" android:layout_height="48dp" android:padding="14dp" android:src="@drawable/ic_outline_close_24" app:tint="?attr/colorOnSurfaceVariant" />
+        </LinearLayout>
+        <TextView android:text="周数范围" android:textSize="13sp" android:textColor="?attr/colorOnSurfaceVariant" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="6dp" />
+        <androidx.appcompat.widget.LinearLayoutCompat android:id="@id/ll_weeks" android:tag="weeko_action_field" android:layout_width="match_parent" android:layout_height="wrap_content">
+            <com.google.android.material.textview.MaterialTextView android:id="@id/et_weeks" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp" android:padding="12dp" android:gravity="center_vertical" android:textSize="15sp" android:textColor="?attr/colorOnSurface" android:hint="选择周数" />
+        </androidx.appcompat.widget.LinearLayoutCompat>
+        <TextView android:text="星期与节次" android:textSize="13sp" android:textColor="?attr/colorOnSurfaceVariant" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:layout_marginBottom="6dp" />
+        <LinearLayout android:id="@id/ll_time" android:tag="weeko_time_options" android:orientation="horizontal" android:gravity="center_vertical" android:layout_width="match_parent" android:layout_height="wrap_content">
+            <com.google.android.material.textview.MaterialTextView android:id="@id/et_time" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:minHeight="48dp" android:padding="12dp" android:gravity="center_vertical" android:textSize="15sp" android:textColor="?attr/colorOnSurface" />
+            <com.google.android.material.checkbox.MaterialCheckBox android:id="@id/cb_own_time" android:layout_width="wrap_content" android:layout_height="wrap_content" android:minHeight="48dp" android:paddingEnd="8dp" android:text="自定义时间" android:textSize="13sp" android:textColor="?attr/colorOnSurfaceVariant" android:visibility="gone" />
+        </LinearLayout>
+        <androidx.appcompat.widget.LinearLayoutCompat android:id="@id/ll_own_time" android:visibility="gone" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp">
+            <com.google.android.material.button.MaterialButtonToggleGroup android:layout_width="match_parent" android:layout_height="wrap_content" app:selectionRequired="false">
+                <com.google.android.material.button.MaterialButton android:id="@id/btn_start_time" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:minWidth="0dp" android:minHeight="48dp" android:textSize="14sp" android:text="上课时间" style="@style/Widget.Material3.Button.OutlinedButton" />
+                <com.google.android.material.button.MaterialButton android:id="@id/btn_end_time" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:minWidth="0dp" android:minHeight="48dp" android:textSize="14sp" android:text="下课时间" android:checkable="false" style="@style/Widget.Material3.Button.OutlinedButton" />
+            </com.google.android.material.button.MaterialButtonToggleGroup>
+        </androidx.appcompat.widget.LinearLayoutCompat>
+        <TextView android:text="授课教师（可不填）" android:textSize="13sp" android:textColor="?attr/colorOnSurfaceVariant" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:layout_marginBottom="6dp" />
+        <androidx.appcompat.widget.LinearLayoutCompat android:id="@id/ll_teacher" android:orientation="vertical" android:tag="weeko_action_field" android:layout_width="match_parent" android:layout_height="wrap_content">
+            <com.google.android.material.textview.MaterialTextView android:id="@id/et_teacher" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp" android:padding="12dp" android:gravity="center_vertical" android:textSize="15sp" android:textColor="?attr/colorOnSurface" android:textColorHint="?attr/colorOnSurfaceVariant" android:hint="请输入教师" />
+        </androidx.appcompat.widget.LinearLayoutCompat>
+        <TextView android:text="上课地点（可不填）" android:textSize="13sp" android:textColor="?attr/colorOnSurfaceVariant" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:layout_marginBottom="6dp" />
+        <androidx.appcompat.widget.LinearLayoutCompat android:id="@id/ll_room" android:orientation="vertical" android:tag="weeko_action_field" android:layout_width="match_parent" android:layout_height="wrap_content">
+            <com.google.android.material.textview.MaterialTextView android:id="@id/et_room" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp" android:padding="12dp" android:gravity="center_vertical" android:textSize="15sp" android:textColor="?attr/colorOnSurface" android:textColorHint="?attr/colorOnSurfaceVariant" android:hint="请输入地点" />
+        </androidx.appcompat.widget.LinearLayoutCompat>
+        <androidx.appcompat.widget.LinearLayoutCompat android:id="@id/ll_note" android:visibility="gone" android:layout_width="match_parent" android:layout_height="wrap_content">
+            <com.google.android.material.textview.MaterialTextView android:id="@id/tv_note" android:layout_width="match_parent" android:layout_height="wrap_content" />
+        </androidx.appcompat.widget.LinearLayoutCompat>
+    </LinearLayout>
+</LinearLayout>

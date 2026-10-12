@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:paddingBottom="16dp" android:tag="weeko_add_base">
+    <LinearLayout android:id="@id/rl_root" android:tag="weeko_card" android:orientation="vertical" android:padding="16dp" android:layout_width="match_parent" android:layout_height="wrap_content">
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="课程信息" android:textSize="18sp" android:fontFamily="sans-serif-medium" android:textColor="?attr/colorOnSurface" android:layout_marginBottom="16dp" />
+        <androidx.appcompat.widget.LinearLayoutCompat android:id="@id/ll_course_name" android:orientation="vertical" android:layout_width="match_parent" android:layout_height="wrap_content">
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="课程名称" android:textSize="14sp" android:textColor="?attr/colorOnSurface" android:layout_marginBottom="8dp" />
+            <androidx.appcompat.widget.AppCompatEditText android:id="@id/et_name" android:tag="weeko_field" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp" android:padding="12dp" android:textSize="15sp" android:textColor="?attr/colorOnSurface" android:textColorHint="?attr/colorOnSurfaceVariant" android:hint="请输入课程名称" android:singleLine="true" />
+            <HorizontalScrollView android:id="@id/sv_candidate_name" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:scrollbars="none">
+                <com.google.android.material.chip.ChipGroup android:id="@id/cg_candidate_name" android:layout_width="wrap_content" android:layout_height="wrap_content" app:singleSelection="true" app:singleLine="true" app:chipSpacingHorizontal="8dp" />
+            </HorizontalScrollView>
+        </androidx.appcompat.widget.LinearLayoutCompat>
+        <androidx.appcompat.widget.LinearLayoutCompat android:id="@id/ll_color" android:tag="weeko_action" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp" android:gravity="center_vertical" android:layout_marginTop="8dp">
+            <TextView android:text="课程颜色" android:textSize="14sp" android:textColor="?attr/colorOnSurface" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" />
+            <TextView android:text="更多颜色 ›" android:textSize="13sp" android:textColor="?attr/colorPrimary" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+            <androidx.appcompat.widget.AppCompatImageView android:id="@id/iv_color" android:visibility="gone" android:layout_width="1dp" android:layout_height="1dp" />
+            <com.google.android.material.textview.MaterialTextView android:id="@id/tv_color" android:visibility="gone" android:layout_width="1dp" android:layout_height="1dp" />
+        </androidx.appcompat.widget.LinearLayoutCompat>
+        <HorizontalScrollView android:layout_width="match_parent" android:layout_height="wrap_content" android:scrollbars="none">
+            <LinearLayout android:tag="weeko_colors" android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal" />
+        </HorizontalScrollView>
+        <TextView android:text="学分（可不填）" android:textSize="14sp" android:textColor="?attr/colorOnSurfaceVariant" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:layout_marginBottom="8dp" />
+        <androidx.appcompat.widget.LinearLayoutCompat android:id="@id/ll_credit" android:tag="weeko_action_field" android:layout_width="match_parent" android:layout_height="wrap_content">
+            <com.google.android.material.textview.MaterialTextView android:id="@id/tv_credit" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp" android:padding="12dp" android:gravity="center_vertical" android:textSize="15sp" android:textColor="?attr/colorOnSurface" android:textColorHint="?attr/colorOnSurfaceVariant" android:hint="请输入学分" />
+        </androidx.appcompat.widget.LinearLayoutCompat>
+        <TextView android:text="备注（可不填）" android:textSize="14sp" android:textColor="?attr/colorOnSurfaceVariant" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:layout_marginBottom="8dp" />
+        <androidx.appcompat.widget.LinearLayoutCompat android:id="@id/ll_note" android:tag="weeko_action_field" android:layout_width="match_parent" android:layout_height="wrap_content">
+            <com.google.android.material.textview.MaterialTextView android:id="@id/tv_note" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="64dp" android:padding="12dp" android:textSize="15sp" android:textColor="?attr/colorOnSurface" android:textColorHint="?attr/colorOnSurfaceVariant" android:hint="请输入备注" />
+        </androidx.appcompat.widget.LinearLayoutCompat>
+    </LinearLayout>
+</LinearLayout>

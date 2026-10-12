@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="WeekoEduBottomChip" parent="Widget.Material3.Chip.Assist">
+        <item name="android:textSize">14sp</item>
+        <item name="android:textStyle">normal</item>
+        <item name="android:textColor">@color/weeko_edu_bottom_foreground</item>
+        <item name="android:minHeight">48dp</item>
+        <item name="chipMinHeight">32sp</item>
+        <item name="chipBackgroundColor">@color/weeko_edu_bottom_surface</item>
+        <item name="chipIconVisible">false</item>
+        <item name="checkedIconVisible">false</item>
+        <item name="rippleColor">@color/weeko_edu_bottom_ripple</item>
+        <item name="ensureMinTouchTargetSize">true</item>
+    </style>
+</resources>

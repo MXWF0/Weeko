@@ -785,3 +785,7 @@ Copy-Item -LiteralPath (Join-Path $PSScriptRoot "assets\weeko-v115\weeko_about_f
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot "weeko-popup-window-animations-v115.xml") -Destination (Join-Path $project "res\values\weeko_popup_window_animations_v115.xml") -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot "weeko-popup-window-exit-v115.xml") -Destination (Join-Path $project "res\anim\weeko_popup_window_exit_v115.xml") -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot "weeko-layered-window-hold-v115.xml") -Destination (Join-Path $project "res\anim\weeko_layered_window_hold_v115.xml") -Force
+
+# Shared educational-import toolbar presentation; original event handlers retained.
+& $pwsh -NoProfile -File (Join-Path $PSScriptRoot 'replay-weeko-edu-bottom.ps1') -ProjectPath $project
+if ($LASTEXITCODE -ne 0) { throw 'Educational-import bottom-bar replay failed' }

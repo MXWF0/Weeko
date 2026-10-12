@@ -27,9 +27,13 @@ import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
 import android.view.animation.DecelerateInterpolator;
 import android.view.animation.Transformation;
+import android.window.BackEvent;
+import android.window.OnBackAnimationCallback;
+import android.window.OnBackInvokedDispatcher;
 import android.widget.FrameLayout;
 import java.util.IdentityHashMap;
 import java.util.ArrayList;
+import java.util.WeakHashMap;
 import io.github.mxwf.weeko.popup.GlassPopupBackground;
 
 /** Shared page motion. Dialogs and external activities retain their own transitions. */
@@ -37,8 +41,9 @@ public final class LayeredPageTransition {
     private static final long DURATION = 320;
     private static final float DIM = 0.18f;
     private static final IdentityHashMap<Activity, PageSession> pages = new IdentityHashMap<>();
-    private static final IdentityHashMap<Activity, ReturnMotion> returns = new IdentityHashMap<>();
     private static final ArrayList<PendingPage> pending = new ArrayList<>();
+    private static final IdentityHashMap<Activity, Boolean> launching = new IdentityHashMap<>();
+    private static final WeakHashMap<View, Float> fragmentProgress = new WeakHashMap<>();
 
     private LayeredPageTransition() {}
 
@@ -60,8 +65,6 @@ public final class LayeredPageTransition {
             @Override public void onActivityPaused(Activity activity) {
                 PageSession page = pages.get(activity);
                 if (page != null) page.interrupt();
-                ReturnMotion motion = returns.remove(activity);
-                if (motion != null) motion.clear();
             }
             @Override public void onActivityStopped(Activity activity) {}
             @Override public void onActivitySaveInstanceState(Activity activity, Bundle state) {}
@@ -70,6 +73,7 @@ public final class LayeredPageTransition {
     }
 
     public static void start(Context context, Intent intent) {
+        if (navigationBusy(context, intent)) return;
         if (prepare(context, intent)) {
             int hold = context.getResources().getIdentifier("weeko_layered_window_hold_v115", "anim", context.getPackageName());
             context.startActivity(intent, ActivityOptions.makeCustomAnimation(context, hold, hold).toBundle());
@@ -77,6 +81,7 @@ public final class LayeredPageTransition {
     }
 
     public static void startForResult(Activity activity, Intent intent, int request, Bundle options) {
+        if (navigationBusy(activity, intent)) return;
         if (prepare(activity, intent)) {
             int hold = activity.getResources().getIdentifier("weeko_layered_window_hold_v115", "anim", activity.getPackageName());
             Bundle motion = ActivityOptions.makeCustomAnimation(activity, hold, hold).toBundle();
@@ -108,33 +113,41 @@ public final class LayeredPageTransition {
         PageSession source = pages.get(activity);
         if (source != null) source.interrupt();
         pending.add(new PendingPage(name, activity, capture(content)));
+        launching.put(activity, true);
         return true;
     }
 
+    private static boolean navigationBusy(Context context, Intent intent) {
+        if (intent.getComponent() == null
+                || !context.getPackageName().equals(intent.getComponent().getPackageName())) return false;
+        while (context instanceof ContextWrapper && !(context instanceof Activity))
+            context = ((ContextWrapper) context).getBaseContext();
+        if (!(context instanceof Activity)) return false;
+        PageSession page = pages.get((Activity) context);
+        return launching.containsKey((Activity) context)
+                || (page != null && (page.exiting || (page.started && page.progress < 1f)));
+    }
+
     public static void resumed(Activity activity) {
+        launching.remove(activity);
         PageSession page = pages.get(activity);
-        if (page != null) page.enter();
-        ReturnMotion motion = returns.get(activity);
-        if (motion != null) motion.start();
+        if (page != null) {
+            page.enter();
+            page.registerBack();
+        }
     }
 
     public static void destroyed(Activity activity) {
+        launching.remove(activity);
         PageSession page = pages.remove(activity);
         if (page != null) page.dispose();
-        ReturnMotion motion = returns.remove(activity);
-        if (motion != null) motion.clear();
     }
 
-    /** Preserve synchronous finish semantics; the resumed page owns the return animation. */
+    /** Reverse the same live progress before finishing the window. */
     public static boolean finish(Activity activity) {
         PageSession page = pages.get(activity);
         if (page != null && !page.finished) {
-            page.interrupt();
-            page.finished = true;
-            ReturnMotion old = returns.remove(page.source);
-            if (old != null) old.clear();
-            if (!page.source.isDestroyed()) returns.put(page.source,
-                    new ReturnMotion(page.source, capture(page.content)));
+            return page.exit();
         }
         return false;
     }
@@ -199,9 +212,10 @@ public final class LayeredPageTransition {
         Underlay layer;
         ValueAnimator animator;
         float progress;
-        boolean started, finished;
+        boolean started, finished, exiting, interactive;
+        BackGesture backGesture;
         final Runnable firstFrame = () -> {
-            if (!finished && layer != null) animate(1f);
+            if (!finished && !exiting && !interactive && layer != null) animate(1f);
         };
         final Runnable frameCommitted = () -> content.postOnAnimation(firstFrame);
 
@@ -212,6 +226,11 @@ public final class LayeredPageTransition {
         void enter() {
             if (started) return;
             started = true;
+            // Dynamic themes can replace AppTheme's no-op window animation.
+            // This session owns the complete slide, including window dismissal.
+            activity.getWindow().setWindowAnimations(0);
+            if (Build.VERSION.SDK_INT >= 34)
+                activity.overrideActivityTransition(Activity.OVERRIDE_TRANSITION_CLOSE, 0, 0);
             content = activity.findViewById(android.R.id.content);
             ViewGroup host = (ViewGroup) content.getParent();
             Trace.beginSection(host instanceof android.widget.LinearLayout ? "Weeko.host.linear" : "Weeko.host.other");
@@ -257,6 +276,10 @@ public final class LayeredPageTransition {
             Trace.beginSection("Weeko.enter.update");
             progress = fraction;
             if (Build.VERSION.SDK_INT >= 29) Trace.setCounter("Weeko.enter.progress", Math.round(fraction * 1000));
+            if (Build.VERSION.SDK_INT >= 29) {
+                Trace.setCounter("Weeko.page.progress", Math.round(fraction * 1000));
+                Trace.setCounter("Weeko.page.direction", exiting ? -1 : interactive ? 0 : 1);
+            }
             content.setTranslationX(content.getWidth() * (1f - fraction));
             layer.setTranslationX(-content.getWidth() * 0.2f * fraction);
             layer.update(fraction);
@@ -271,9 +294,16 @@ public final class LayeredPageTransition {
             animator.addUpdateListener(value -> update((float) value.getAnimatedValue()));
             animator.addListener(new AnimatorListenerAdapter() {
                 @Override public void onAnimationEnd(Animator animation) {
-                    layer.clear();
-                    layer = null;
                     animator = null;
+                    if (to == 0f) {
+                        unregisterBack();
+                        finished = true;
+                        activity.finish();
+                        activity.overridePendingTransition(0, 0);
+                    } else {
+                        layer.clear();
+                        layer = null;
+                    }
                 }
             });
             animator.start();
@@ -289,6 +319,7 @@ public final class LayeredPageTransition {
 
         void interrupt() {
             if (finished) return;
+            unregisterBack();
             if (content != null) content.getViewTreeObserver().removeOnPreDrawListener(this);
             if (content != null && Build.VERSION.SDK_INT >= 29) {
                 content.getViewTreeObserver().unregisterFrameCommitCallback(frameCommitted);
@@ -296,7 +327,7 @@ public final class LayeredPageTransition {
             }
             cancelAnimator();
             if (layer != null) {
-                update(1f);
+                update(exiting ? 0f : 1f);
                 layer.clear();
                 layer = null;
             }
@@ -304,9 +335,68 @@ public final class LayeredPageTransition {
                 sample.release();
                 sample = null;
             }
+            if (exiting) {
+                finished = true;
+                activity.finish();
+                activity.overridePendingTransition(0, 0);
+            }
+        }
+
+        void stopScheduledEntrance() {
+            content.getViewTreeObserver().removeOnPreDrawListener(this);
+            if (Build.VERSION.SDK_INT >= 29) {
+                content.getViewTreeObserver().unregisterFrameCommitCallback(frameCommitted);
+                content.removeCallbacks(firstFrame);
+            }
+            cancelAnimator();
+        }
+
+        void revealSource() {
+            if (layer != null) return;
+            ViewGroup host = (ViewGroup) content.getParent();
+            layer = new Underlay(host, capture(source.findViewById(android.R.id.content)), false);
+            host.addView(layer, host.indexOfChild(content), new ViewGroup.LayoutParams(-1, -1));
+            layer.setX(content.getLeft());
+            layer.setY(content.getTop());
+        }
+
+        boolean exit() {
+            if (exiting) return true;
+            if (content == null || content.getWidth() == 0) {
+                interrupt();
+                finished = true;
+                return false;
+            }
+            stopScheduledEntrance();
+            revealSource();
+            exiting = true;
+            update(progress);
+            animate(0f);
+            return true;
+        }
+
+        void registerBack() {
+            if (Build.VERSION.SDK_INT < 34 || backGesture != null) return;
+            // Legacy NavHost pages retain their Fragment dispatcher. A native
+            // activity gesture must not preview popping that internal stack.
+            boolean plainPage = activity.getClass().getName().equals("io.github.mxwf.weeko.about.WeekoAboutActivity");
+            for (Class<?> type = activity.getClass(); type != null; type = type.getSuperclass())
+                plainPage |= type.getName().equals("com.suda.yzune.wakeupschedule.base_view.BaseListActivity");
+            if (!plainPage) return;
+            backGesture = new BackGesture(this);
+            activity.getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                    OnBackInvokedDispatcher.PRIORITY_DEFAULT, backGesture);
+        }
+
+        void unregisterBack() {
+            if (Build.VERSION.SDK_INT >= 34 && backGesture != null) {
+                activity.getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(backGesture);
+                backGesture = null;
+            }
         }
 
         void clear() {
+            unregisterBack();
             cancelAnimator();
             if (content != null) {
                 content.getViewTreeObserver().removeOnPreDrawListener(this);
@@ -318,6 +408,7 @@ public final class LayeredPageTransition {
         }
 
         void dispose() {
+            unregisterBack();
             cancelAnimator();
             // onDestroy can precede the last window frame. Release after actual detachment.
             if (content != null && content.isAttachedToWindow()) {
@@ -333,78 +424,33 @@ public final class LayeredPageTransition {
         }
     }
 
-    private static final class ReturnMotion implements ViewTreeObserver.OnPreDrawListener {
-        final Activity activity;
-        PageSnapshot outgoing;
-        ViewGroup content;
-        Underlay back, front;
-        ValueAnimator animator;
-        boolean started;
-        final Runnable firstFrame = () -> {
-            if (back != null) animate();
-        };
-        final Runnable frameCommitted = () -> content.postOnAnimation(firstFrame);
-
-        ReturnMotion(Activity activity, PageSnapshot outgoing) { this.activity = activity; this.outgoing = outgoing; }
-
-        void start() {
-            if (started) return;
-            started = true;
-            content = activity.findViewById(android.R.id.content);
-            content.getViewTreeObserver().addOnPreDrawListener(this);
+    private static final class BackGesture implements OnBackAnimationCallback {
+        private final PageSession page;
+        private final DecelerateInterpolator easing = new DecelerateInterpolator();
+        private float start;
+        BackGesture(PageSession page) { this.page = page; }
+        @Override public void onBackStarted(BackEvent event) {
+            if (page.backGesture != this || page.exiting || page.finished) return;
+            page.interactive = true;
+            page.stopScheduledEntrance();
+            page.revealSource();
+            start = page.progress;
         }
-
-        @Override public boolean onPreDraw() {
-            content.getViewTreeObserver().removeOnPreDrawListener(this);
-            back = new Underlay(content);
-            front = new Underlay(content, outgoing, true);
-            outgoing = null;
-            front.update(0f);
-            update(1f);
-            if (Build.VERSION.SDK_INT >= 29 && content.isHardwareAccelerated()) {
-                content.getViewTreeObserver().registerFrameCommitCallback(frameCommitted);
-            } else animate();
-            return true;
+        @Override public void onBackProgressed(BackEvent event) {
+            if (page.backGesture != this || page.exiting || page.finished) return;
+            page.update(start * (1f - easing.getInterpolation(event.getProgress())));
         }
-
-        void animate() {
-            animator = ValueAnimator.ofFloat(1f, 0f);
-            animator.setDuration(DURATION);
-            animator.setInterpolator(new DecelerateInterpolator());
-            animator.addUpdateListener(value -> update((float) value.getAnimatedValue()));
-            animator.addListener(new AnimatorListenerAdapter() {
-                @Override public void onAnimationEnd(Animator animation) {
-                    returns.remove(activity);
-                    clear();
-                }
-            });
-            animator.start();
+        @Override public void onBackCancelled() {
+            if (page.backGesture != this || page.exiting || page.finished) return;
+            page.interactive = false;
+            page.animate(1f);
         }
-
-        void update(float fraction) {
-            Trace.beginSection("Weeko.return.update");
-            if (Build.VERSION.SDK_INT >= 29) Trace.setCounter("Weeko.return.progress", Math.round(fraction * 1000));
-            back.setTranslationX(-content.getWidth() * 0.2f * fraction);
-            back.update(fraction);
-            front.setTranslationX(content.getWidth() * (1f - fraction));
-            Trace.endSection();
-        }
-
-        void clear() {
-            if (animator != null) {
-                animator.removeAllListeners();
-                animator.cancel();
-                animator = null;
-            }
-            if (content != null) content.getViewTreeObserver().removeOnPreDrawListener(this);
-            if (content != null && Build.VERSION.SDK_INT >= 29) {
-                content.getViewTreeObserver().unregisterFrameCommitCallback(frameCommitted);
-                content.removeCallbacks(firstFrame);
-            }
-            if (front != null) { front.clear(); front = null; }
-            if (back != null) { back.clear(); back = null; }
-            if (outgoing != null) outgoing.release();
-            outgoing = null;
+        @Override public void onBackInvoked() {
+            if (page.backGesture != this || page.exiting || page.finished) return;
+            page.interactive = false;
+            page.activity.onBackPressed();
+            // Unsaved-data prompts retain their existing choice and navigation.
+            if (!page.exiting && !page.finished && page.layer != null) page.animate(1f);
         }
     }
 
@@ -426,6 +472,8 @@ public final class LayeredPageTransition {
         private final int role;
         private Underlay layer;
         private int width;
+        private View container;
+        private float returnStart = 1f;
 
         PageAnimation(View target, int role) {
             this.target = target;
@@ -437,15 +485,22 @@ public final class LayeredPageTransition {
         @Override public void initialize(int width, int height, int parentWidth, int parentHeight) {
             super.initialize(width, height, parentWidth, parentHeight);
             this.width = parentWidth;
+            container = (View) target.getParent();
+            if (role == 2 || role == 3) {
+                Float interrupted = fragmentProgress.get(container);
+                if (interrupted != null) returnStart = interrupted;
+            }
             if (role == 1 || role == 2) layer = new Underlay((ViewGroup) target);
         }
 
         @Override protected void applyTransformation(float fraction, Transformation transform) {
-            float x = role == 0 ? 1f - fraction : role == 3 ? fraction
-                    : role == 1 ? -0.2f * fraction : -0.2f * (1f - fraction);
+            float progress = role == 0 || role == 1 ? fraction : returnStart * (1f - fraction);
+            if (fraction == 1f) fragmentProgress.remove(container);
+            else fragmentProgress.put(container, progress);
+            float x = role == 0 || role == 3 ? 1f - progress : -0.2f * progress;
             transform.getMatrix().setTranslate(width * x, 0f);
             if (layer != null) {
-                layer.update(role == 1 ? fraction : 1f - fraction);
+                layer.update(progress);
                 if (fraction == 1f) { layer.clear(); layer = null; }
             }
         }
