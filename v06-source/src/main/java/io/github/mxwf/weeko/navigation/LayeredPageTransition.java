@@ -252,9 +252,7 @@ public final class LayeredPageTransition {
             // requests a second layout of the destination's entire view tree.
             host.addView(layer, host.indexOfChild(content), new ViewGroup.LayoutParams(-1, -1));
             // The destination is an opaque page, not a second translucent image of the source.
-            TypedValue surface = new TypedValue();
-            activity.getTheme().resolveAttribute(android.R.attr.colorBackground, surface, true);
-            content.setBackgroundColor(surface.data);
+            opaquePage(content);
             content.getViewTreeObserver().addOnPreDrawListener(this);
         }
 
@@ -467,6 +465,12 @@ public final class LayeredPageTransition {
         return new PageAnimation(view, role);
     }
 
+    private static void opaquePage(View page) {
+        TypedValue surface = new TypedValue();
+        page.getContext().getTheme().resolveAttribute(android.R.attr.colorBackground, surface, true);
+        page.setBackgroundColor(surface.data);
+    }
+
     private static final class PageAnimation extends Animation {
         private final View target;
         private final int role;
@@ -478,6 +482,9 @@ public final class LayeredPageTransition {
         PageAnimation(View target, int role) {
             this.target = target;
             this.role = role;
+            // Fragment roots can be transparent lists, unlike Activity content.
+            // Both pages need the same opaque canvas before sampling or sliding.
+            if (target.getBackground() == null) opaquePage(target);
             setDuration(DURATION);
             setInterpolator(new DecelerateInterpolator());
         }
@@ -495,6 +502,10 @@ public final class LayeredPageTransition {
 
         @Override protected void applyTransformation(float fraction, Transformation transform) {
             float progress = role == 0 || role == 1 ? fraction : returnStart * (1f - fraction);
+            if (Build.VERSION.SDK_INT >= 29) {
+                Trace.setCounter("Weeko.fragment.role", role);
+                Trace.setCounter("Weeko.fragment.progress", Math.round(progress * 1000));
+            }
             if (fraction == 1f) fragmentProgress.remove(container);
             else fragmentProgress.put(container, progress);
             float x = role == 0 || role == 3 ? 1f - progress : -0.2f * progress;
@@ -527,6 +538,9 @@ public final class LayeredPageTransition {
 
         Underlay(ViewGroup parent, PageSnapshot sample, boolean overlay) {
             super(parent.getContext());
+            // Cover the live source once; transparent snapshot gaps must not
+            // reveal a second, unblurred copy of the source's text or controls.
+            opaquePage(this);
             this.parent = parent;
             int width = parent.getWidth(), height = parent.getHeight();
             this.sample = sample;
