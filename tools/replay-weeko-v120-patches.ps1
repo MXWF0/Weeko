@@ -22,6 +22,8 @@ $manifestText = [IO.File]::ReadAllText($manifestPath)
 $androidNamespace = 'http://schemas.android.com/apk/res/android'
 foreach ($entry in $manifest.manifest.application.activity) {
     $name = $entry.GetAttribute('name', $androidNamespace)
+    # Add and edit share this Activity and retain the legacy unsaved-edit dispatcher.
+    if ($name -eq 'com.suda.yzune.wakeupschedule.course_add.AddCourseActivity') { continue }
     $type = $name
     while ($type.StartsWith('com.suda.yzune.wakeupschedule.') -or $type -eq 'io.github.mxwf.weeko.about.WeekoAboutActivity') {
         if ($type -eq 'com.suda.yzune.wakeupschedule.base_view.BaseListActivity' -or

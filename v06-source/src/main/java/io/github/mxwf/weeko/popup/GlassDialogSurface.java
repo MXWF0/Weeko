@@ -19,6 +19,7 @@ import android.view.WindowManager;
 import android.widget.AbsListView;
 import io.github.mxwf.weeko.about.G2ShapeDrawable;
 import io.github.mxwf.weeko.theme.SoftDynamicColors;
+import io.github.mxwf.weeko.theme.UiEffects;
 import java.lang.ref.WeakReference;
 
 /** Shared visual treatment for Weeko-owned confirmation, choice and input dialogs. */
@@ -53,6 +54,7 @@ public final class GlassDialogSurface {
     }
 
     private static void applyFallback(Dialog dialog, View surface, int tint, int border, float radius, boolean topOnly) {
+            if (!UiEffects.advancedMaterials(dialog.getContext())) return;
             Context owner = dialog.getContext();
             while (owner instanceof ContextWrapper && !(owner instanceof Activity)) {
                 owner = ((ContextWrapper) owner).getBaseContext();
@@ -70,7 +72,7 @@ public final class GlassDialogSurface {
                 }
                 View overlay = sheetRoot;
                 surface.post(() -> {
-                    if (!dialog.isShowing()) return;
+                    if (!dialog.isShowing() || !UiEffects.advancedMaterials(dialog.getContext())) return;
                     int[] position = new int[2];
                     int[] origin = new int[2];
                     surface.getLocationOnScreen(position);
@@ -100,13 +102,13 @@ public final class GlassDialogSurface {
     static int surfaceColor(Context context, String name) {
         int base = context.getResources().getColor(context.getResources().getIdentifier(name, "color", context.getPackageName()));
         if (Build.VERSION.SDK_INT < 31 || !context.getSharedPreferences("config", Context.MODE_PRIVATE)
-                .getBoolean("dynamic_colors", false)) return base;
+                .getBoolean("dynamic_colors", false)) return UiEffects.surface(context, base);
         int attribute = context.getResources().getIdentifier("colorSurface", "attr", context.getPackageName());
         TypedArray values = context.obtainStyledAttributes(new int[]{attribute});
         int surface = values.getColor(0, base);
         values.recycle();
         int accent = SoftDynamicColors.resolveAccent(context, base);
-        return Color.argb(Color.alpha(base),
+        return Color.argb(UiEffects.advancedMaterials(context) ? Color.alpha(base) : 255,
                 Math.round(Color.red(surface) * 0.94f + Color.red(accent) * 0.06f),
                 Math.round(Color.green(surface) * 0.94f + Color.green(accent) * 0.06f),
                 Math.round(Color.blue(surface) * 0.94f + Color.blue(accent) * 0.06f));
@@ -131,6 +133,13 @@ public final class GlassDialogSurface {
             int id = context.getResources().getIdentifier("design_bottom_sheet", "id", context.getPackageName());
             View sheet = dialog.findViewById(id);
             roundMaterialSurfaces(sheet);
+            if (!UiEffects.advancedMaterials(context) && Build.VERSION.SDK_INT >= 31) {
+                window.setBackgroundBlurRadius(0);
+                window.clearFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND);
+                WindowManager.LayoutParams attributes = window.getAttributes();
+                attributes.setBlurBehindRadius(0);
+                window.setAttributes(attributes);
+            }
             // The course detail already owns its progressive blur and G2 surface.
             if (sheet.getBackground() instanceof CourseDetailG2SheetDrawableV114) return;
             float density = sheet.getResources().getDisplayMetrics().density;
@@ -138,6 +147,7 @@ public final class GlassDialogSurface {
             sheet.setBackground(new G2ShapeDrawable(tint, 0, 0, density * 32f, true));
             sheet.setClipToOutline(true);
             sheet.setElevation(density * 2f);
+            if (!UiEffects.advancedMaterials(context)) return;
             if (Build.VERSION.SDK_INT >= 31 && window.getWindowManager().isCrossWindowBlurEnabled()) {
                 window.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND);
                 WindowManager.LayoutParams attributes = window.getAttributes();
@@ -157,7 +167,7 @@ public final class GlassDialogSurface {
                 float radius = (float) type.getMethod("getRadius").invoke(view);
                 int stroke = (int) type.getMethod("getStrokeColor").invoke(view);
                 int width = (int) type.getMethod("getStrokeWidth").invoke(view);
-                view.setBackground(new G2ShapeDrawable(colors.getDefaultColor(), stroke, width, radius));
+                view.setBackground(new G2ShapeDrawable(UiEffects.surface(view.getContext(), colors.getDefaultColor()), stroke, width, radius));
                 view.setForeground(null);
                 view.setClipToOutline(true);
             } else if ("com.google.android.material.button.MaterialButton".equals(type.getName())) {

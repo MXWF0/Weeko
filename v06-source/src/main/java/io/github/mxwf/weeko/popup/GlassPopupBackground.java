@@ -15,6 +15,7 @@ import android.widget.AbsListView;
 import android.widget.TextView;
 import android.widget.ImageView;
 import io.github.mxwf.weeko.theme.SoftDynamicColors;
+import io.github.mxwf.weeko.theme.UiEffects;
 
 public final class GlassPopupBackground {
     private GlassPopupBackground() {}
@@ -124,18 +125,21 @@ public final class GlassPopupBackground {
             View root = anchor.getRootView();
             root.getLocationOnScreen(rootPosition);
 
-            Bitmap sample = Bitmap.createBitmap(Math.max(1, width / 4), Math.max(1, height / 4), Bitmap.Config.ARGB_8888);
-            Canvas sampleCanvas = new Canvas(sample);
-            sampleCanvas.scale(sample.getWidth() / (float) width, sample.getHeight() / (float) height);
-            sampleCanvas.translate(rootPosition[0] - popupPosition[0], rootPosition[1] - popupPosition[1]);
-            root.draw(sampleCanvas);
-            blur(sample, Math.max(1, Math.round(6f * content.getResources().getDisplayMetrics().density / 4f)));
-
             Resources resources = content.getResources();
             int tint = GlassDialogSurface.surfaceColor(content.getContext(), "weeko_v114_popup_glass");
             float density = resources.getDisplayMetrics().density;
             int borderId = resources.getIdentifier("weeko_v114_popup_outline", "color", content.getContext().getPackageName());
-            content.setBackground(new GlassSurfaceDrawable(sample, tint, resources.getColor(borderId), density, 20f));
+            if (UiEffects.advancedMaterials(content.getContext())) {
+                Bitmap sample = Bitmap.createBitmap(Math.max(1, width / 4), Math.max(1, height / 4), Bitmap.Config.ARGB_8888);
+                Canvas sampleCanvas = new Canvas(sample);
+                sampleCanvas.scale(sample.getWidth() / (float) width, sample.getHeight() / (float) height);
+                sampleCanvas.translate(rootPosition[0] - popupPosition[0], rootPosition[1] - popupPosition[1]);
+                root.draw(sampleCanvas);
+                blur(sample, Math.max(1, Math.round(6f * density / 4f)));
+                content.setBackground(new GlassSurfaceDrawable(sample, tint, resources.getColor(borderId), density, 20f));
+            } else {
+                content.setBackground(new G2ShapeDrawable(tint, resources.getColor(borderId), density * 0.5f, density * 20f));
+            }
             content.setClipToOutline(true);
             popup.setElevation(7f * density);
             content.setElevation(7f * density);

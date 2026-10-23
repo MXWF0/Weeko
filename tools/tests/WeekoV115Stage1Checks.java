@@ -55,32 +55,18 @@ public final class WeekoV115Stage1Checks {
         }
         System.out.println("PASS: 32 color state combinations, order and alpha preserved");
 
-        int[] listeners = {0};
-        WindowManager manager = (WindowManager) Proxy.newProxyInstance(
-                WindowManager.class.getClassLoader(), new Class<?>[]{WindowManager.class}, (proxy, method, values) -> {
-                    if (method.getName().equals("isCrossWindowBlurEnabled")) return false;
-                    if (method.getName().equals("addCrossWindowBlurEnabledListener")) { listeners[0]++; return null; }
-                    if (method.getName().equals("removeCrossWindowBlurEnabledListener")) { listeners[0]--; return null; }
-                    throw new AssertionError("Unexpected WindowManager call: " + method.getName());
-                });
-        Context context = new ContextWrapper(themed) {
-            @Override public Object getSystemService(String name) {
-                return WINDOW_SERVICE.equals(name) ? manager : super.getSystemService(name);
-            }
-        };
-        CourseDetailBlurFallbackV115 fallback = new CourseDetailBlurFallbackV115(new View(context));
+        CourseDetailBlurFallbackV115 fallback = new CourseDetailBlurFallbackV115(new View(themed));
         Field applied = CourseDetailBlurFallbackV115.class.getDeclaredField("appliedRadius");
         applied.setAccessible(true);
         fallback.update(6);
-        if (applied.getInt(fallback) != 6) throw new AssertionError("Fallback not applied");
-        fallback.accept(true);
-        if (applied.getInt(fallback) != 0) throw new AssertionError("System blur did not clear fallback");
-        fallback.accept(false);
-        if (applied.getInt(fallback) != 6) throw new AssertionError("Fallback not restored");
+        if (applied.getFloat(fallback) != 6f) throw new AssertionError("Fallback not applied");
+        fallback.update(3.25f);
+        if (applied.getFloat(fallback) != 3.25f) throw new AssertionError("Fractional progressive blur not updated");
+        fallback.update(0);
+        if (applied.getFloat(fallback) != 0f) throw new AssertionError("Blur not cleared");
+        fallback.update(6);
         fallback.close();
-        if (listeners[0] != 0) throw new AssertionError("Blur listener retained after close");
-        fallback.accept(false);
-        if (applied.getInt(fallback) != 0) throw new AssertionError("Closed fallback reapplied blur");
-        System.out.println("PASS: blur off/on/off transition and listener cleanup");
+        if (applied.getFloat(fallback) != 0f) throw new AssertionError("Closed fallback retained blur");
+        System.out.println("PASS: app-owned progressive blur and close cleanup");
     }
 }

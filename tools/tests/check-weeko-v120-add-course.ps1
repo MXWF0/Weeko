@@ -22,6 +22,13 @@ foreach ($name in $unchanged) {
     if ($old -ne $new) { throw "Business implementation changed: $name" }
 }
 $metadata = [IO.File]::ReadAllText((Join-Path $root "$ProjectPath/apktool.yml"))
+[xml]$manifest = [IO.File]::ReadAllText((Join-Path $root "$ProjectPath/AndroidManifest.xml"))
+$androidNamespace = 'http://schemas.android.com/apk/res/android'
+$editor = @($manifest.manifest.application.activity | Where-Object { $_.GetAttribute('name',$androidNamespace) -eq 'com.suda.yzune.wakeupschedule.course_add.AddCourseActivity' })[0]
+if ($manifest.manifest.application.GetAttribute('enableOnBackInvokedCallback',$androidNamespace) -ne 'false' -or
+        $editor.GetAttribute('enableOnBackInvokedCallback',$androidNamespace) -eq 'true') { throw 'Course editor must disable predictive back and retain the original dispatcher' }
+$motion = [IO.File]::ReadAllText((Join-Path $root 'v06-source/src/main/java/io/github/mxwf/weeko/navigation/LayeredPageTransition.java'))
+if ($motion -notmatch 'if \(activity.getClass\(\).getName\(\).equals\("com.suda.yzune.wakeupschedule.course_add.AddCourseActivity"\)\) return;') { throw 'Course editor must not register the predictive animation callback' }
 if ($metadata -notmatch 'versionCode: 20' -or $metadata -notmatch 'versionName: 1.2.0') { throw 'Version metadata mismatch' }
 $helper = [IO.File]::ReadAllText((Join-Path $root 'v06-source/src/main/java/io/github/mxwf/weeko/editor/AddCourseAppearanceV120.java'))
 if ($helper -notmatch 'public static boolean isEditor\(Context context\)' -or

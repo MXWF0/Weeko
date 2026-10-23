@@ -20,6 +20,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.RippleDrawable;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Trace;
 import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyProperties;
 import android.system.ErrnoException;
@@ -46,11 +47,19 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.window.BackEvent;
+import android.window.OnBackAnimationCallback;
+import android.window.OnBackInvokedCallback;
+import android.window.OnBackInvokedDispatcher;
 
 import io.github.mxwf.weeko.theme.SoftDynamicColors;
+import io.github.mxwf.weeko.theme.UiEffects;
 import io.github.mxwf.weeko.about.G2ShapeDrawable;
 import io.github.mxwf.weeko.popup.GlassDialogSurface;
 import io.github.mxwf.weeko.popup.CourseDetailG2SheetDrawableV114;
+import io.github.mxwf.weeko.popup.CourseDetailBlurFallbackV115;
+import java.lang.ref.WeakReference;
+import android.content.ContextWrapper;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -81,6 +90,10 @@ public final class PasswordVaultActivity extends Activity {
     private static final String FILE_NAME = "password-vault.bin";
     private static final int MAGIC = 0x57564c54;
     private static final int FORMAT_VERSION = 1;
+    private static WeakReference<View> openingBackdrop = new WeakReference<>(null);
+    private static WeakReference<PasswordVaultActivity> visibleVault = new WeakReference<>(null);
+    private static boolean opening;
+    private CourseDetailBlurFallbackV115 backdropBlur;
 
     private final List<Record> records = new ArrayList<>();
     private LinearLayout sheetRoot;
@@ -91,12 +104,13 @@ public final class PasswordVaultActivity extends Activity {
     private Interpolator sheetInterpolator;
     private AnimatorSet sheetAnimator;
     private int maxBlurRadius;
-    private int lastBlurRadius = -1;
+    private float lastBlurRadius = -1f;
     private float backdropFraction;
     private float gestureDownX;
     private float gestureDownY;
     private float dragStartY;
-    private int dragStartOffset;
+    private float dragStartOffset;
+    private float dragStartBackdrop;
     private int touchSlop;
     private boolean dragCandidate;
     private boolean sheetDragging;
@@ -104,9 +118,22 @@ public final class PasswordVaultActivity extends Activity {
     private boolean sheetEntranceStarted;
     private boolean sheetClosing;
     private boolean useDynamicColors;
+    private boolean foreground;
+    private OnBackInvokedCallback systemBack;
+    private boolean backPreview;
+    private final Runnable entranceStart = this::animateSheetEntrance;
     private final Map<String, Integer> resolvedColors = new HashMap<>();
 
     public static void open(Context context) {
+        if (opening || visibleVault.get() != null) return;
+        opening = true;
+        Context owner = context;
+        while (owner instanceof ContextWrapper && !(owner instanceof Activity)) {
+            owner = ((ContextWrapper) owner).getBaseContext();
+        }
+        if (owner instanceof Activity) {
+            openingBackdrop = new WeakReference<>(((Activity) owner).findViewById(android.R.id.content));
+        }
         context.startActivity(new Intent(context, PasswordVaultActivity.class));
         if (context instanceof Activity) {
             ((Activity) context).overridePendingTransition(0, 0);
@@ -121,11 +148,12 @@ public final class PasswordVaultActivity extends Activity {
             finishImmediately();
             return;
         }
-        if (sheetAnimator != null) sheetAnimator.cancel();
+        cancelSheetAnimation();
         animateSheetExit();
     }
 
     private void finishImmediately() {
+        if (backdropBlur != null) backdropBlur.close();
         Window window = getWindow();
         WindowManager.LayoutParams attributes = window.getAttributes();
         attributes.dimAmount = 0f;
@@ -141,6 +169,96 @@ public final class PasswordVaultActivity extends Activity {
         overridePendingTransition(0, 0);
     }
 
+    @Override protected void onDestroy() {
+        cancelSheetAnimation();
+        if (sheetRoot != null) sheetRoot.removeCallbacks(entranceStart);
+        if (backdropBlur != null) backdropBlur.close();
+        if (visibleVault.get() == this) visibleVault.clear();
+        super.onDestroy();
+    }
+
+    @Override protected void onStop() {
+        foreground = false;
+        cancelSheetAnimation();
+        if (sheetRoot != null) {
+            sheetRoot.removeCallbacks(entranceStart);
+            sheetRoot.setTranslationY(0f);
+            sheetRoot.setAlpha(1f);
+        }
+        if (dragVelocity != null) {
+            dragVelocity.recycle();
+            dragVelocity = null;
+        }
+        dragCandidate = sheetDragging = false;
+        if (backdropBlur != null) backdropBlur.close();
+        if (scrim != null) scrim.setAlpha(0f);
+        lastBlurRadius = -1f;
+        backdropFraction = 1f;
+        if (sheetClosing) finishImmediately();
+        super.onStop();
+    }
+
+    @Override protected void onResume() {
+        super.onResume();
+        foreground = true;
+        if (sheetEntranceStarted && !sheetClosing) applyBackdrop(backdropFraction);
+        if (Build.VERSION.SDK_INT >= 33) {
+            systemBack = UiEffects.predictiveBack(this) && sheetRoot != null
+                    ? new VaultBackGesture() : this::onBackPressed;
+            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                    OnBackInvokedDispatcher.PRIORITY_DEFAULT, systemBack);
+        }
+    }
+
+    @Override protected void onPause() {
+        if (Build.VERSION.SDK_INT >= 33 && systemBack != null) {
+            getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(systemBack);
+            systemBack = null;
+        }
+        if (backPreview) {
+            backPreview = false;
+            cancelSheetAnimation();
+            sheetRoot.setTranslationY(0f);
+            sheetRoot.setAlpha(1f);
+            backdropFraction = 1f;
+        }
+        super.onPause();
+    }
+
+    private final class VaultBackGesture implements OnBackAnimationCallback {
+        @Override public void onBackStarted(BackEvent event) {
+            if (sheetClosing) return;
+            backPreview = true;
+            sheetRoot.removeCallbacks(entranceStart);
+            cancelSheetAnimation();
+            dragStartOffset = sheetRoot.getTranslationY();
+            dragStartBackdrop = backdropFraction;
+        }
+        @Override public void onBackProgressed(BackEvent event) {
+            if (!backPreview) return;
+            float fraction = sheetInterpolator.getInterpolation(event.getProgress());
+            sheetRoot.setTranslationY(dragStartOffset + (sheetHeight() - dragStartOffset) * fraction);
+            applyBackdrop(dragStartBackdrop * (1f - fraction));
+            Trace.setCounter("Weeko.vault.back.progress", Math.round(fraction * 1000));
+        }
+        @Override public void onBackCancelled() {
+            if (!backPreview) return;
+            backPreview = false;
+            animateSheetRebound();
+        }
+        @Override public void onBackInvoked() {
+            backPreview = false;
+            finish();
+        }
+    }
+
+    private void cancelSheetAnimation() {
+        if (sheetAnimator == null) return;
+        sheetAnimator.removeAllListeners();
+        sheetAnimator.cancel();
+        sheetAnimator = null;
+    }
+
     @Override
     public boolean dispatchTouchEvent(MotionEvent event) {
         if (sheetRoot == null || sheetClosing || sheetRoot.getHeight() == 0) {
@@ -152,6 +270,13 @@ public final class PasswordVaultActivity extends Activity {
                 sheetRoot.getLocationOnScreen(sheetPosition);
                 dragCandidate = event.getRawY() >= sheetPosition[1]
                         && event.getRawY() <= sheetPosition[1] + sheetRoot.getHeight();
+                // The native ScrollView owns its edge stretch. Sheet dragging
+                // starts outside the list, including the drag handle/header.
+                recordScroll.getLocationOnScreen(sheetPosition);
+                if (event.getRawY() >= sheetPosition[1]
+                        && event.getRawY() < sheetPosition[1] + recordScroll.getHeight()) {
+                    dragCandidate = false;
+                }
                 sheetDragging = false;
                 if (dragCandidate) {
                     gestureDownX = event.getRawX();
@@ -165,21 +290,20 @@ public final class PasswordVaultActivity extends Activity {
                     dragVelocity.addMovement(event);
                     float dy = event.getRawY() - gestureDownY;
                     if (!sheetDragging && dy > touchSlop
-                            && dy > Math.abs(event.getRawX() - gestureDownX)
-                            && recordScroll.getScrollY() == 0) {
+                            && dy > Math.abs(event.getRawX() - gestureDownX)) {
                         sheetDragging = true;
-                        if (sheetAnimator != null) sheetAnimator.cancel();
+                        cancelSheetAnimation();
                         MotionEvent cancel = MotionEvent.obtain(event);
                         cancel.setAction(MotionEvent.ACTION_CANCEL);
                         super.dispatchTouchEvent(cancel);
                         cancel.recycle();
                         dragStartY = event.getRawY();
-                        dragStartOffset = Math.round(sheetRoot.getTranslationY());
-                        sheetRoot.setAlpha(1f);
+                        dragStartOffset = sheetRoot.getTranslationY();
+                        dragStartBackdrop = backdropFraction;
                     }
                     if (sheetDragging) {
                         applySheetOffset(dragStartOffset
-                                + Math.round(event.getRawY() - dragStartY));
+                                + event.getRawY() - dragStartY);
                         return true;
                     }
                 }
@@ -229,6 +353,12 @@ public final class PasswordVaultActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        opening = false;
+        visibleVault = new WeakReference<>(this);
+        View backdrop = openingBackdrop.get();
+        openingBackdrop.clear();
+        if (backdrop != null && UiEffects.advancedMaterials(this))
+            backdropBlur = new CourseDetailBlurFallbackV115(backdrop);
         useDynamicColors = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
                 && getSharedPreferences("config", MODE_PRIVATE).getBoolean("dynamic_colors", false);
         if (useDynamicColors) {
@@ -308,6 +438,8 @@ public final class PasswordVaultActivity extends Activity {
                 result = withAlpha(result, Color.alpha(fallback));
             }
         }
+        if (name.equals("weeko_v114_detail_sheet") || name.equals("weeko_v114_detail_card"))
+            result = UiEffects.surface(this, result);
         resolvedColors.put(name, result);
         return result;
     }
@@ -410,6 +542,7 @@ public final class PasswordVaultActivity extends Activity {
 
         ScrollView scroll = new ScrollView(this);
         recordScroll = scroll;
+        scroll.setOverScrollMode(View.OVER_SCROLL_ALWAYS);
         scroll.setClipToPadding(false);
         list = new LinearLayout(this);
         list.setOrientation(LinearLayout.VERTICAL);
@@ -499,7 +632,7 @@ public final class PasswordVaultActivity extends Activity {
         });
         root.requestApplyInsets();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            window.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND);
+            window.clearFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND);
             WindowManager.LayoutParams blurAttributes = window.getAttributes();
             blurAttributes.setBlurBehindRadius(0);
             window.setAttributes(blurAttributes);
@@ -511,28 +644,24 @@ public final class PasswordVaultActivity extends Activity {
         return sheetRoot.getHeight() > 0 ? sheetRoot.getHeight() : sheetRoot.getMeasuredHeight();
     }
 
-    private void applySheetOffset(int requestedOffset) {
+    private void applySheetOffset(float requestedOffset) {
         int height = sheetHeight();
-        int offset = Math.max(0, Math.min(height, requestedOffset));
+        float offset = Math.max(0f, Math.min(height, requestedOffset));
         sheetRoot.setTranslationY(offset);
-        applyBackdrop(1f - offset / (float) height);
+        applyBackdrop(dragStartBackdrop * (height - offset) / (height - dragStartOffset));
     }
 
     private void applyBackdrop(float fraction) {
         backdropFraction = Math.max(0f, Math.min(1f, fraction));
         scrim.setAlpha(0.32f * backdropFraction);
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return;
-        int radius = Math.round(maxBlurRadius * backdropFraction);
+        float radius = maxBlurRadius * backdropFraction;
         if (radius == lastBlurRadius) return;
         lastBlurRadius = radius;
-        Window window = getWindow();
-        WindowManager.LayoutParams attributes = window.getAttributes();
-        attributes.setBlurBehindRadius(radius);
-        window.setAttributes(attributes);
+        if (backdropBlur != null) backdropBlur.update(radius);
     }
 
     private void animateSheetEntrance() {
-        if (sheetClosing) return;
+        if (sheetClosing || !foreground) return;
         int startOffset = Math.round(sheetHeight() * 0.20000004f);
         sheetRoot.setTranslationY(startOffset);
         applyBackdrop(0f);
@@ -558,7 +687,7 @@ public final class PasswordVaultActivity extends Activity {
     }
 
     private void animateSheetRebound() {
-        if (sheetAnimator != null) sheetAnimator.cancel();
+        cancelSheetAnimation();
         float startOffset = sheetRoot.getTranslationY();
         float startAlpha = sheetRoot.getAlpha();
         float startBackdrop = backdropFraction;
@@ -631,7 +760,7 @@ public final class PasswordVaultActivity extends Activity {
             sheetRoot.setLayoutParams(sheetParams);
             if (!sheetEntranceStarted) {
                 sheetEntranceStarted = true;
-                sheetRoot.post(this::animateSheetEntrance);
+                sheetRoot.post(entranceStart);
             }
         });
     }

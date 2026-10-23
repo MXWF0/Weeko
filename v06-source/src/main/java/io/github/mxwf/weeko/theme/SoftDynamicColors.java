@@ -48,6 +48,19 @@ public final class SoftDynamicColors {
         return softenPrimary(themeColor(context, "colorPrimary"), dark);
     }
 
+    /** Keep the original text-only indicator; increase contrast in either theme. */
+    public static void styleDateHighlight(TextView date, int accent) {
+        if (!date.getText().toString().contains("/")) return;
+        boolean dark = (date.getResources().getConfiguration().uiMode
+                & android.content.res.Configuration.UI_MODE_NIGHT_MASK)
+                == android.content.res.Configuration.UI_MODE_NIGHT_YES;
+        int target = dark ? 255 : 0;
+        date.setTextColor(Color.rgb(
+                Math.round(Color.red(accent) * 0.86f + target * 0.14f),
+                Math.round(Color.green(accent) * 0.86f + target * 0.14f),
+                Math.round(Color.blue(accent) * 0.86f + target * 0.14f)));
+    }
+
     public static void apply(Activity activity) {
         apply(activity, activity.findViewById(android.R.id.content));
     }
@@ -308,11 +321,14 @@ public final class SoftDynamicColors {
             int softenedPrimary = softenPrimary(primary, dark);
             int softenedPrimaryContainer = softenPrimary(primaryContainer, dark);
             originals = new int[]{primary, primaryContainer, secondary, secondaryContainer,
-                    tertiary, tertiaryContainer, detailAccent, detailAccentContainer};
+                    tertiary, tertiaryContainer, detailAccent, detailAccentContainer,
+                    resourceColor(context, "md_theme_primary"),
+                    resourceColor(context, "md_theme_primaryContainer"), 0xff2f80ff, 0xff2196f3};
             softened = new int[]{softenedPrimary, softenedPrimaryContainer,
                     softenSecondary(secondary, dark), softenSecondary(secondaryContainer, dark),
                     softenTertiary(tertiary, dark), softenTertiary(tertiaryContainer, dark),
-                    softenedPrimary, softenedPrimaryContainer};
+                    softenedPrimary, softenedPrimaryContainer,
+                    softenedPrimary, softenedPrimaryContainer, softenedPrimary, softenedPrimary};
         }
 
         private int soften(int color) {

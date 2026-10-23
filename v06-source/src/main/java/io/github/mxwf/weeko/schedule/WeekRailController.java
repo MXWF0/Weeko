@@ -374,6 +374,13 @@ public final class WeekRailController implements SeekBar.OnSeekBarChangeListener
     }
 
     private void refreshBackdrop() {
+        Context context = rail.getContext();
+        backdrop.surface = surfaceBackground(context, (context.getResources().getConfiguration().uiMode
+                & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES);
+        if (!io.github.mxwf.weeko.theme.UiEffects.advancedMaterials(rail.getContext())) {
+            backdrop.setBitmap(null);
+            return;
+        }
         if (!showing || !railPositioned || rootParent == null
                 || rail.getWidth() == 0 || rail.getHeight() == 0) {
             return;
@@ -560,7 +567,8 @@ public final class WeekRailController implements SeekBar.OnSeekBarChangeListener
     private static GradientDrawable surfaceBackground(Context context, boolean dark) {
         GradientDrawable drawable = new GradientDrawable();
         int surface = dark ? DARK_SURFACE : LIGHT_SURFACE;
-        drawable.setColor((surface & 0x00ffffff) | (dark ? 0xc8000000 : 0xc0000000));
+        drawable.setColor(io.github.mxwf.weeko.theme.UiEffects.surface(context,
+                (surface & 0x00ffffff) | (dark ? 0xc8000000 : 0xc0000000)));
         drawable.setCornerRadius(18f * context.getResources().getDisplayMetrics().density);
         drawable.setStroke(1, dark ? 0x4a5e7192 : 0x3d5d7db5);
         return drawable;
@@ -700,7 +708,7 @@ public final class WeekRailController implements SeekBar.OnSeekBarChangeListener
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
         private final Path clipPath = new Path();
         private final RectF bounds = new RectF();
-        private final Drawable surface;
+        private Drawable surface;
         private final float cornerRadius;
         private Bitmap bitmap;
 

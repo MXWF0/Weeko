@@ -29,12 +29,14 @@ import android.view.animation.DecelerateInterpolator;
 import android.view.animation.Transformation;
 import android.window.BackEvent;
 import android.window.OnBackAnimationCallback;
+import android.window.OnBackInvokedCallback;
 import android.window.OnBackInvokedDispatcher;
 import android.widget.FrameLayout;
 import java.util.IdentityHashMap;
 import java.util.ArrayList;
 import java.util.WeakHashMap;
 import io.github.mxwf.weeko.popup.GlassPopupBackground;
+import io.github.mxwf.weeko.theme.UiEffects;
 
 /** Shared page motion. Dialogs and external activities retain their own transitions. */
 public final class LayeredPageTransition {
@@ -44,11 +46,14 @@ public final class LayeredPageTransition {
     private static final ArrayList<PendingPage> pending = new ArrayList<>();
     private static final IdentityHashMap<Activity, Boolean> launching = new IdentityHashMap<>();
     private static final WeakHashMap<View, Float> fragmentProgress = new WeakHashMap<>();
+    private static final IdentityHashMap<ViewGroup, FragmentBackStack> fragmentBacks = new IdentityHashMap<>();
+    private static final IdentityHashMap<Activity, OnBackInvokedCallback> restoredBacks = new IdentityHashMap<>();
 
     private LayeredPageTransition() {}
 
 
     public static void install(Application application) {
+        application.getSharedPreferences("config", 0).registerOnSharedPreferenceChangeListener(effectsChanged);
         application.registerActivityLifecycleCallbacks(new Application.ActivityLifecycleCallbacks() {
             @Override public void onActivityCreated(Activity activity, Bundle state) {
                 for (int i = 0; i < pending.size(); i++) {
@@ -63,6 +68,9 @@ public final class LayeredPageTransition {
             @Override public void onActivityStarted(Activity activity) {}
             @Override public void onActivityResumed(Activity activity) { resumed(activity); }
             @Override public void onActivityPaused(Activity activity) {
+                removeRestoredBack(activity);
+                for (FragmentBackStack stack : fragmentBacks.values())
+                    if (stack.activity == activity) stack.resetPreview();
                 PageSession page = pages.get(activity);
                 if (page != null) page.interrupt();
             }
@@ -71,6 +79,24 @@ public final class LayeredPageTransition {
             @Override public void onActivityDestroyed(Activity activity) { destroyed(activity); }
         });
     }
+
+    private static final android.content.SharedPreferences.OnSharedPreferenceChangeListener effectsChanged = (prefs, key) -> {
+        if (!UiEffects.PREDICTIVE_BACK.equals(key) && !UiEffects.ADVANCED_MATERIALS.equals(key)) return;
+        for (PageSession page : new ArrayList<>(pages.values())) {
+            page.unregisterBack();
+            if (page.interactive && !page.exiting) {
+                page.interactive = false;
+                page.animate(1f);
+            }
+            if (page.layer != null) page.layer.update(page.progress);
+            if (page.activity.hasWindowFocus()) page.registerBack();
+        }
+        for (FragmentBackStack stack : fragmentBacks.values()) stack.resetPreview();
+        for (Activity activity : new ArrayList<>(restoredBacks.keySet())) {
+            removeRestoredBack(activity);
+            if (activity.hasWindowFocus()) resumed(activity);
+        }
+    };
 
     public static void start(Context context, Intent intent) {
         if (navigationBusy(context, intent)) return;
@@ -134,10 +160,62 @@ public final class LayeredPageTransition {
         if (page != null) {
             page.enter();
             page.registerBack();
+        } else if (Build.VERSION.SDK_INT >= 33 && supportsActivityBack(activity)
+                && !restoredBacks.containsKey(activity)) {
+            OnBackInvokedCallback callback = UiEffects.predictiveBack(activity)
+                    ? new BackGesture(activity, null) : activity::onBackPressed;
+            restoredBacks.put(activity, callback);
+            activity.getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                    OnBackInvokedDispatcher.PRIORITY_DEFAULT, callback);
+        }
+    }
+
+    private static boolean supportsActivityBack(Activity activity) {
+        if (activity.getClass().getName().equals("io.github.mxwf.weeko.about.WeekoAboutActivity")) return true;
+        if (activity.getClass().getName().contains(".schedule_appwidget.")) return false;
+        for (Class<?> type = activity.getClass(); type != null; type = type.getSuperclass())
+            if (type.getName().equals("com.suda.yzune.wakeupschedule.base_view.BaseActivity")) return true;
+        return false;
+    }
+
+    private static void removeRestoredBack(Activity activity) {
+        OnBackInvokedCallback callback = restoredBacks.remove(activity);
+        if (Build.VERSION.SDK_INT >= 33 && callback != null)
+            activity.getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(callback);
+    }
+
+    /** NavHost enables its legacy bridge after navigation. Keep one native owner
+     * at the SAME normal priority, then commit through the original dispatcher.
+     * A higher priority would incorrectly intercept the input method's back. */
+    public static void frameworkBackRegistered(Object dispatcher) {
+        for (PageSession page : pages.values()) {
+            if (page.activity.getOnBackInvokedDispatcher() != dispatcher) continue;
+            OnBackInvokedCallback callback = page.backGesture != null ? page.backGesture : page.ordinaryBack;
+            if (callback != null) {
+                page.activity.getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(callback);
+                page.activity.getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                        OnBackInvokedDispatcher.PRIORITY_DEFAULT, callback);
+            }
+            return;
+        }
+        for (Activity activity : restoredBacks.keySet()) {
+            if (activity.getOnBackInvokedDispatcher() != dispatcher) continue;
+            OnBackInvokedCallback callback = restoredBacks.get(activity);
+            activity.getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(callback);
+            activity.getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                    OnBackInvokedDispatcher.PRIORITY_DEFAULT, callback);
+            return;
         }
     }
 
     public static void destroyed(Activity activity) {
+        removeRestoredBack(activity);
+        for (FragmentBackStack stack : new ArrayList<>(fragmentBacks.values())) {
+            if (stack.activity == activity) {
+                stack.dispose();
+                fragmentBacks.remove(stack.container);
+            }
+        }
         launching.remove(activity);
         PageSession page = pages.remove(activity);
         if (page != null) page.dispose();
@@ -214,6 +292,7 @@ public final class LayeredPageTransition {
         float progress;
         boolean started, finished, exiting, interactive;
         BackGesture backGesture;
+        OnBackInvokedCallback ordinaryBack;
         final Runnable firstFrame = () -> {
             if (!finished && !exiting && !interactive && layer != null) animate(1f);
         };
@@ -374,22 +453,29 @@ public final class LayeredPageTransition {
         }
 
         void registerBack() {
-            if (Build.VERSION.SDK_INT < 34 || backGesture != null) return;
-            // Legacy NavHost pages retain their Fragment dispatcher. A native
-            // activity gesture must not preview popping that internal stack.
-            boolean plainPage = activity.getClass().getName().equals("io.github.mxwf.weeko.about.WeekoAboutActivity");
-            for (Class<?> type = activity.getClass(); type != null; type = type.getSuperclass())
-                plainPage |= type.getName().equals("com.suda.yzune.wakeupschedule.base_view.BaseListActivity");
-            if (!plainPage) return;
-            backGesture = new BackGesture(this);
-            activity.getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
-                    OnBackInvokedDispatcher.PRIORITY_DEFAULT, backGesture);
+            if (Build.VERSION.SDK_INT < 33 || backGesture != null || ordinaryBack != null) return;
+            if (!supportsActivityBack(activity)) return;
+            if (UiEffects.predictiveBack(activity)) {
+                backGesture = new BackGesture(activity, this);
+                activity.getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                        OnBackInvokedDispatcher.PRIORITY_DEFAULT, backGesture);
+            } else {
+                // A non-animated callback consumes system preview, then invokes the
+                // original dispatcher (including unsaved-data confirmation).
+                ordinaryBack = activity::onBackPressed;
+                activity.getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                        OnBackInvokedDispatcher.PRIORITY_DEFAULT, ordinaryBack);
+            }
         }
 
         void unregisterBack() {
             if (Build.VERSION.SDK_INT >= 34 && backGesture != null) {
                 activity.getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(backGesture);
                 backGesture = null;
+            }
+            if (Build.VERSION.SDK_INT >= 33 && ordinaryBack != null) {
+                activity.getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(ordinaryBack);
+                ordinaryBack = null;
             }
         }
 
@@ -423,32 +509,166 @@ public final class LayeredPageTransition {
     }
 
     private static final class BackGesture implements OnBackAnimationCallback {
+        private final Activity activity;
         private final PageSession page;
+        private FragmentBackStack fragment;
         private final DecelerateInterpolator easing = new DecelerateInterpolator();
         private float start;
-        BackGesture(PageSession page) { this.page = page; }
+        private boolean pagePreview;
+        BackGesture(Activity activity, PageSession page) { this.activity = activity; this.page = page; }
+        private boolean active() {
+            return page == null ? restoredBacks.get(activity) == this
+                    : page.backGesture == this && !page.exiting && !page.finished;
+        }
         @Override public void onBackStarted(BackEvent event) {
+            if (!active()) return;
+            fragment = null;
+            pagePreview = false;
+            // Browser history is an in-page back, not a return to the school list.
+            ArrayList<View> views = new ArrayList<>();
+            views.add(activity.findViewById(android.R.id.content));
+            for (int i = 0; i < views.size(); i++) {
+                View view = views.get(i);
+                if (view instanceof android.webkit.WebView && ((android.webkit.WebView) view).canGoBack()) return;
+                if (view instanceof ViewGroup) {
+                    ViewGroup group = (ViewGroup) view;
+                    for (int child = 0; child < group.getChildCount(); child++) views.add(group.getChildAt(child));
+                }
+            }
+            for (FragmentBackStack stack : fragmentBacks.values()) {
+                if (stack.activity == activity && !stack.history.isEmpty()
+                        && stack.current.isShown()) {
+                    fragment = stack;
+                    fragment.begin();
+                    start = fragment.progress;
+                    return;
+                }
+            }
+            if (page == null) return;
             if (page.backGesture != this || page.exiting || page.finished) return;
+            pagePreview = true;
             page.interactive = true;
             page.stopScheduledEntrance();
             page.revealSource();
             start = page.progress;
         }
         @Override public void onBackProgressed(BackEvent event) {
+            if (!active()) return;
+            if (fragment != null) { fragment.update(start * (1f - easing.getInterpolation(event.getProgress()))); return; }
+            if (!pagePreview) return;
             if (page.backGesture != this || page.exiting || page.finished) return;
             page.update(start * (1f - easing.getInterpolation(event.getProgress())));
         }
         @Override public void onBackCancelled() {
+            if (!active()) { fragment = null; return; }
+            if (fragment != null) { fragment.restore(); fragment = null; return; }
+            if (!pagePreview) return;
             if (page.backGesture != this || page.exiting || page.finished) return;
             page.interactive = false;
             page.animate(1f);
         }
         @Override public void onBackInvoked() {
+            if (!active()) return;
+            if (fragment != null) {
+                FragmentBackStack stack = fragment;
+                fragment = null;
+                fragmentProgress.put(stack.container, stack.progress);
+                activity.onBackPressed();
+                // A prompt may consume back without popping. Decide at the next
+                // traversal, after FragmentManager has applied its actual change.
+                stack.container.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
+                    @Override public boolean onPreDraw() {
+                        stack.container.getViewTreeObserver().removeOnPreDrawListener(this);
+                        if (stack.stage != null) stack.restore();
+                        return true;
+                    }
+                });
+                return;
+            }
+            if (!pagePreview) { activity.onBackPressed(); return; }
             if (page.backGesture != this || page.exiting || page.finished) return;
             page.interactive = false;
             page.activity.onBackPressed();
             // Unsaved-data prompts retain their existing choice and navigation.
             if (!page.exiting && !page.finished && page.layer != null) page.animate(1f);
+        }
+    }
+
+    /** Preview only the internal page stack recorded by the four shared Nav animations.
+     * The real NavHost/unsaved-data dispatcher is invoked only on gesture commit. */
+    private static final class FragmentBackStack {
+        final Activity activity;
+        final ViewGroup container;
+        final ArrayList<PageSnapshot> history = new ArrayList<>();
+        View current;
+        FrameLayout stage;
+        Underlay layer;
+        ValueAnimator animator;
+        float progress = 1f;
+        FragmentBackStack(ViewGroup container, Activity activity) {
+            this.container = container; this.activity = activity;
+        }
+        void begin() {
+            cancelAnimator();
+            Animation motion = current.getAnimation();
+            if (motion != null) motion.cancel();
+            current.clearAnimation();
+            Float interrupted = fragmentProgress.get(container);
+            progress = interrupted == null ? 1f : interrupted;
+            if (stage == null) {
+                PageSnapshot saved = history.get(history.size() - 1);
+                stage = new FrameLayout(activity);
+                int width = current.getWidth(), height = current.getHeight();
+                layer = new Underlay(stage, new PageSnapshot(saved.commands, saved.pixels), false);
+                stage.addView(layer, new FrameLayout.LayoutParams(-1, -1));
+                stage.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+                        View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY));
+                stage.layout(current.getLeft(), current.getTop(), current.getRight(), current.getBottom());
+                container.getOverlay().add(stage);
+            }
+            update(progress);
+        }
+        void update(float value) {
+            progress = value;
+            int width = current.getWidth();
+            current.setTranslationX(width * (1f - value));
+            layer.setTranslationX(-width * 0.2f * value);
+            layer.update(value);
+            stage.setClipBounds(new Rect(0, 0, Math.round(width * (1f - value)), current.getHeight()));
+            if (Build.VERSION.SDK_INT >= 29) Trace.setCounter("Weeko.fragment.gesture", Math.round(value * 1000));
+        }
+        void restore() {
+            cancelAnimator();
+            animator = ValueAnimator.ofFloat(progress, 1f);
+            animator.setDuration(DURATION);
+            animator.setInterpolator(new DecelerateInterpolator());
+            animator.addUpdateListener(value -> update((float) value.getAnimatedValue()));
+            animator.addListener(new AnimatorListenerAdapter() {
+                @Override public void onAnimationEnd(Animator animation) { resetPreview(); }
+            });
+            animator.start();
+        }
+        void cancelAnimator() {
+            if (animator != null) {
+                animator.removeAllListeners();
+                animator.cancel();
+                animator = null;
+            }
+        }
+        void resetPreview() {
+            cancelAnimator();
+            if (stage == null) return;
+            current.setTranslationX(0f);
+            layer.release();
+            container.getOverlay().remove(stage);
+            stage = null;
+            layer = null;
+            fragmentProgress.remove(container);
+        }
+        void dispose() {
+            resetPreview();
+            for (PageSnapshot sample : history) sample.release();
+            history.clear();
         }
     }
 
@@ -493,10 +713,24 @@ public final class LayeredPageTransition {
             super.initialize(width, height, parentWidth, parentHeight);
             this.width = parentWidth;
             container = (View) target.getParent();
+            ViewGroup host = (ViewGroup) container;
+            FragmentBackStack stack = fragmentBacks.get(host);
+            if (stack == null) {
+                Context owner = target.getContext();
+                while (owner instanceof ContextWrapper && !(owner instanceof Activity))
+                    owner = ((ContextWrapper) owner).getBaseContext();
+                stack = new FragmentBackStack(host, (Activity) owner);
+                fragmentBacks.put(host, stack);
+            }
             if (role == 2 || role == 3) {
                 Float interrupted = fragmentProgress.get(container);
                 if (interrupted != null) returnStart = interrupted;
+                stack.resetPreview();
+                fragmentProgress.put(container, returnStart);
             }
+            if (role == 1) stack.history.add(capture((ViewGroup) target));
+            if (role == 2 && !stack.history.isEmpty()) stack.history.remove(stack.history.size() - 1).release();
+            if (role == 0 || role == 2) stack.current = target;
             if (role == 1 || role == 2) layer = new Underlay((ViewGroup) target);
         }
 
@@ -562,7 +796,7 @@ public final class LayeredPageTransition {
             dim.setBackgroundColor(0xff000000);
             dim.setAlpha(0f);
             addView(dim, new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
-            if (Build.VERSION.SDK_INT < 31) {
+            if (Build.VERSION.SDK_INT < 31 && UiEffects.advancedMaterials(getContext())) {
                 blurred = sample.pixels.copy(Bitmap.Config.ARGB_8888, true);
                 GlassPopupBackground.blur(blurred, Math.max(1, Math.round(
                         getResources().getDisplayMetrics().density * 6f)));
@@ -601,10 +835,14 @@ public final class LayeredPageTransition {
             progress = fraction;
             dim.setAlpha(DIM * fraction);
             if (Build.VERSION.SDK_INT >= 31) {
-                float radius = getResources().getDisplayMetrics().density * 6f * fraction;
+                float radius = UiEffects.advancedMaterials(getContext())
+                        ? getResources().getDisplayMetrics().density * 6f * fraction : 0f;
                 image.setRenderEffect(radius > 0f ? RenderEffect.createBlurEffect(radius, radius,
                         Shader.TileMode.CLAMP) : null);
-            } else image.invalidate();
+            } else {
+                if (!UiEffects.advancedMaterials(getContext())) blurred = null;
+                image.invalidate();
+            }
         }
 
         void clear() {

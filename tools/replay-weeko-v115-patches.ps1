@@ -450,6 +450,19 @@ Replace-V115ExactText $sheetPath @'
     iput-object v14, v12, Lcom/suda/yzune/wakeupschedule/schedule/CourseDetailBottomSheet;->weekoV115BlurCallback:Lcom/suda/yzune/wakeupschedule/schedule/CourseDetailGlassBlurCallbackV115;
 '@
 Replace-V115ExactText $sheetPath @'
+    const/high16 v14, 0x40c00000
+    mul-float v13, v13, v14
+'@ @'
+    const/high16 v14, 0x40a00000
+    mul-float v13, v13, v14
+'@
+Replace-V115ExactText $sheetPath @'
+    invoke-virtual {v11, v13}, Landroid/view/WindowManager$LayoutParams;->setBlurBehindRadius(I)V
+'@ @'
+    const/4 v9, 0x0
+    invoke-virtual {v11, v9}, Landroid/view/WindowManager$LayoutParams;->setBlurBehindRadius(I)V
+'@
+Replace-V115ExactText $sheetPath @'
     invoke-virtual {v1, v2}, Landroid/view/View;->setOnLongClickListener(Landroid/view/View$OnLongClickListener;)V
 
     .line 787
@@ -785,6 +798,56 @@ Copy-Item -LiteralPath (Join-Path $PSScriptRoot "assets\weeko-v115\weeko_about_f
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot "weeko-popup-window-animations-v115.xml") -Destination (Join-Path $project "res\values\weeko_popup_window_animations_v115.xml") -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot "weeko-popup-window-exit-v115.xml") -Destination (Join-Path $project "res\anim\weeko_popup_window_exit_v115.xml") -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot "weeko-layered-window-hold-v115.xml") -Destination (Join-Path $project "res\anim\weeko_layered_window_hold_v115.xml") -Force
+
+# Preview only: retain custom backgrounds and reuse the timetable's semantic palette.
+New-Item -ItemType Directory -Force -Path (Join-Path $project "res\drawable-night") | Out-Null
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot "weeko-appearance-preview-v115.xml") -Destination (Join-Path $project "res\drawable\weeko_appearance_preview_v115.xml") -Force
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot "weeko-appearance-preview-night-v115.xml") -Destination (Join-Path $project "res\drawable-night\weeko_appearance_preview_v115.xml") -Force
+$previewPath = "smali\com\suda\yzune\wakeupschedule\schedule_settings\MainStyleFragment.smali"
+Replace-V115ExactText $previewPath @'
+.method public final OoooOOO()V
+    .locals 10
+'@ @'
+.method public final OoooOOO()V
+    .locals 10
+    iget-object v5, p0, Lcom/suda/yzune/wakeupschedule/schedule_settings/MainStyleFragment;->OooooO0:Landroid/widget/ImageView;
+    invoke-virtual {v5}, Landroid/view/View;->getResources()Landroid/content/res/Resources;
+    move-result-object v6
+    invoke-virtual {v6}, Landroid/content/res/Resources;->getConfiguration()Landroid/content/res/Configuration;
+    move-result-object v6
+    iget v6, v6, Landroid/content/res/Configuration;->uiMode:I
+    and-int/lit8 v6, v6, 0x30
+    const/16 v7, 0x20
+    if-ne v6, v7, :weeko_preview_light
+    const v6, 0xff58616d
+    sget-object v7, Landroid/graphics/PorterDuff$Mode;->MULTIPLY:Landroid/graphics/PorterDuff$Mode;
+    invoke-virtual {v5, v6, v7}, Landroid/widget/ImageView;->setColorFilter(ILandroid/graphics/PorterDuff$Mode;)V
+    goto :weeko_preview_theme_done
+    :weeko_preview_light
+    invoke-virtual {v5}, Landroid/widget/ImageView;->clearColorFilter()V
+    :weeko_preview_theme_done
+'@
+Replace-V115ExactText $previewPath '    const v5, 0x7f0800f4' @'
+    invoke-virtual {p0}, Landroidx/fragment/app/oo0o0Oo;->Oooo0o0()Landroid/content/Context;
+    move-result-object v5
+    invoke-virtual {v5}, Landroid/content/Context;->getPackageName()Ljava/lang/String;
+    move-result-object v8
+    invoke-virtual {v5}, Landroid/content/Context;->getResources()Landroid/content/res/Resources;
+    move-result-object v5
+    const-string v6, "weeko_appearance_preview_v115"
+    const-string v7, "drawable"
+    invoke-virtual {v5, v6, v7, v8}, Landroid/content/res/Resources;->getIdentifier(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)I
+    move-result v5
+'@
+Replace-V115ExactText $previewPath @'
+    :cond_15
+    sget-object v0, Lo00OOOO/o00Oo0;->OooO00o:Lo00OOOO/o00Oo0;
+'@ @'
+    :cond_15
+    iget-object v1, v0, Lcom/suda/yzune/wakeupschedule/schedule_settings/MainStyleFragment;->Ooooo0o:Lcom/suda/yzune/wakeupschedule/schedule/o000OO;
+    invoke-static {v1}, Lcom/suda/yzune/wakeupschedule/schedule/FluentSchedulePalette;->styleSchedule(Lcom/suda/yzune/wakeupschedule/schedule/o000OO;)V
+    sget-object v0, Lo00OOOO/o00Oo0;->OooO00o:Lo00OOOO/o00Oo0;
+'@
 
 # Shared educational-import toolbar presentation; original event handlers retained.
 & $pwsh -NoProfile -File (Join-Path $PSScriptRoot 'replay-weeko-edu-bottom.ps1') -ProjectPath $project

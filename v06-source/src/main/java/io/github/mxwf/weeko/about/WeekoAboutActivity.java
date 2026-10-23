@@ -10,6 +10,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.content.res.ColorStateList;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.Color;
@@ -17,6 +18,7 @@ import android.graphics.drawable.AdaptiveIconDrawable;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.RippleDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -42,11 +44,25 @@ import android.widget.TextView;
 public final class WeekoAboutActivity extends Activity {
     private Resources paletteResources;
 
+    @Override public void finish() {
+        if (io.github.mxwf.weeko.navigation.LayeredPageTransition.finish(this)) return;
+        super.finish();
+    }
+
     private int dp(float value) {
         return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
     }
 
     private int color(String name) {
+        if (Build.VERSION.SDK_INT >= 31 && name.equals("md_theme_primary")
+                && getSharedPreferences("config", MODE_PRIVATE).getBoolean("dynamic_colors", false)) {
+            boolean dark = (paletteResources.getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)
+                    == Configuration.UI_MODE_NIGHT_YES;
+            int accent = getResources().getIdentifier(dark ? "system_accent1_200"
+                    : "system_accent1_600", "color", "android");
+            return io.github.mxwf.weeko.theme.SoftDynamicColors.softenPrimary(
+                    getResources().getColor(accent), dark);
+        }
         int id = getResources().getIdentifier(name, "color", getPackageName());
         Resources resources = paletteResources == null ? getResources() : paletteResources;
         return resources.getColor(id);
@@ -83,7 +99,7 @@ public final class WeekoAboutActivity extends Activity {
         TextView heading = label(title, 16f, text, true);
         heading.setLineSpacing(0f, 1f);
         card.addView(heading, new LinearLayout.LayoutParams(-1, -2));
-        TextView content = label(body, 16f, secondary, false);
+        TextView content = label(body, 14f, secondary, false);
         content.setPadding(0, dp(8), 0, 0);
         Trace.beginSection("Weeko.about.selectable");
         content.setTextIsSelectable(true);
@@ -103,13 +119,18 @@ public final class WeekoAboutActivity extends Activity {
         Button button = new Button(this);
         button.setText(text);
         button.setTextColor(textColor);
-        button.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f);
+        button.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f);
         button.setAllCaps(false);
         button.setMinHeight(dp(48));
         GradientDrawable background = new GradientDrawable();
         background.setColor(backgroundColor);
         background.setCornerRadius(dp(12));
-        button.setBackground(background);
+        GradientDrawable mask = new GradientDrawable();
+        mask.setColor(Color.WHITE);
+        mask.setCornerRadius(dp(12));
+        button.setBackground(new RippleDrawable(ColorStateList.valueOf(
+                (textColor & 0x00ffffff) | 0x1f000000), background, mask));
+        button.setStateListAnimator(null);
         Trace.endSection();
         return button;
     }
@@ -261,8 +282,13 @@ public final class WeekoAboutActivity extends Activity {
         ImageButton back = new ImageButton(this);
         int backIcon = getResources().getIdentifier("ic_back", "drawable", getPackageName());
         back.setImageResource(backIcon);
+        back.setImageTintList(ColorStateList.valueOf(text));
         back.setContentDescription("返回");
-        back.setBackgroundColor(Color.TRANSPARENT);
+        GradientDrawable backMask = new GradientDrawable();
+        backMask.setColor(Color.WHITE);
+        backMask.setCornerRadius(dp(16));
+        back.setBackground(new RippleDrawable(ColorStateList.valueOf(
+                (text & 0x00ffffff) | 0x1f000000), null, backMask));
         back.setPadding(0, 0, 0, 0);
         toolbar.addView(back, new LinearLayout.LayoutParams(dp(56), dp(56)));
         TextView title = label("关于 Weeko", 22f, text, false);
@@ -294,6 +320,9 @@ public final class WeekoAboutActivity extends Activity {
         content.setOrientation(LinearLayout.VERTICAL);
         content.setPadding(dp(16), dp(12), dp(16), dp(24));
 
+        LinearLayout identity = new LinearLayout(this);
+        identity.setGravity(Gravity.CENTER_VERTICAL);
+        identity.setPadding(dp(16), dp(16), dp(16), dp(20));
         ImageView icon = new ImageView(this);
         Trace.beginSection("Weeko.about.icon");
         if (Build.VERSION.SDK_INT >= 26) {
@@ -308,15 +337,19 @@ public final class WeekoAboutActivity extends Activity {
         }
         Trace.endSection();
         icon.setContentDescription("Weeko 课程表");
-        LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(dp(96), dp(96));
-        iconParams.gravity = Gravity.CENTER_HORIZONTAL;
-        iconParams.setMargins(0, 0, 0, dp(8));
-        content.addView(icon, iconParams);
-
-        TextView version = label("版本 " + versionName(), 16f, blue, true);
+        LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(dp(72), dp(72));
+        iconParams.setMargins(0, 0, dp(20), 0);
+        identity.addView(icon, iconParams);
+        LinearLayout identityText = new LinearLayout(this);
+        identityText.setOrientation(LinearLayout.VERTICAL);
+        identityText.addView(label("Weeko", 28f, text, true),
+                new LinearLayout.LayoutParams(-1, -2));
+        TextView version = label("版本 " + versionName(), 14f, secondary, false);
         version.setLineSpacing(0f, 1f);
-        version.setPadding(dp(16), dp(4), dp(16), dp(16));
-        content.addView(version, new LinearLayout.LayoutParams(-1, -2));
+        version.setPadding(0, dp(4), 0, 0);
+        identityText.addView(version, new LinearLayout.LayoutParams(-1, -2));
+        identity.addView(identityText, new LinearLayout.LayoutParams(0, -2, 1f));
+        content.addView(identity, new LinearLayout.LayoutParams(-1, -2));
 
         addCard(content, card("关于 Weeko",
                 "Weeko 面向高校课程表使用。当前版本沿用已验证的课程、课表、作息和导入流程，并逐步整理可独立维护的页面。",

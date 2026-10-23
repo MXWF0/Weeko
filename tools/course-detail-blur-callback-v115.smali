@@ -6,7 +6,7 @@
 .field private final fallback:Lio/github/mxwf/weeko/popup/CourseDetailBlurFallbackV115;
 .field private final maxRadius:I
 .field private final maxDim:F
-.field private lastRadius:I
+.field private lastRadius:F
 
 .method public constructor <init>(Landroid/view/Window;Landroid/view/View;I)V
     .locals 2
@@ -17,12 +17,13 @@
     invoke-direct {v0, p2}, Lio/github/mxwf/weeko/popup/CourseDetailBlurFallbackV115;-><init>(Landroid/view/View;)V
     iput-object v0, p0, Lcom/suda/yzune/wakeupschedule/schedule/CourseDetailGlassBlurCallbackV115;->fallback:Lio/github/mxwf/weeko/popup/CourseDetailBlurFallbackV115;
     iput p3, p0, Lcom/suda/yzune/wakeupschedule/schedule/CourseDetailGlassBlurCallbackV115;->maxRadius:I
+    invoke-virtual {v0, p1, p3}, Lio/github/mxwf/weeko/popup/CourseDetailBlurFallbackV115;->animateEntrance(Landroid/view/Window;I)V
     invoke-virtual {p1}, Landroid/view/Window;->getAttributes()Landroid/view/WindowManager$LayoutParams;
     move-result-object v0
     iget v1, v0, Landroid/view/WindowManager$LayoutParams;->dimAmount:F
     iput v1, p0, Lcom/suda/yzune/wakeupschedule/schedule/CourseDetailGlassBlurCallbackV115;->maxDim:F
-    const/4 v0, -0x1
-    iput v0, p0, Lcom/suda/yzune/wakeupschedule/schedule/CourseDetailGlassBlurCallbackV115;->lastRadius:I
+    const/high16 v0, -0x40800000
+    iput v0, p0, Lcom/suda/yzune/wakeupschedule/schedule/CourseDetailGlassBlurCallbackV115;->lastRadius:F
     return-void
 .end method
 
@@ -34,8 +35,13 @@
 .end method
 
 .method public OooO0OO(Landroid/view/View;I)V
-    .locals 0
+    .locals 1
 
+    const/4 v0, 0x1
+    if-ne p2, v0, :weeko_state_update
+    iget-object v0, p0, Lcom/suda/yzune/wakeupschedule/schedule/CourseDetailGlassBlurCallbackV115;->fallback:Lio/github/mxwf/weeko/popup/CourseDetailBlurFallbackV115;
+    invoke-virtual {v0}, Lio/github/mxwf/weeko/popup/CourseDetailBlurFallbackV115;->interruptEntrance()V
+    :weeko_state_update
     invoke-direct {p0, p1}, Lcom/suda/yzune/wakeupschedule/schedule/CourseDetailGlassBlurCallbackV115;->updateBlur(Landroid/view/View;)V
     return-void
 .end method
@@ -65,20 +71,19 @@
     iget v1, p0, Lcom/suda/yzune/wakeupschedule/schedule/CourseDetailGlassBlurCallbackV115;->maxRadius:I
     int-to-float v1, v1
     mul-float/2addr v0, v1
-    float-to-int v0, v0
-    iget v1, p0, Lcom/suda/yzune/wakeupschedule/schedule/CourseDetailGlassBlurCallbackV115;->lastRadius:I
-    if-eq v0, v1, :done
-    iput v0, p0, Lcom/suda/yzune/wakeupschedule/schedule/CourseDetailGlassBlurCallbackV115;->lastRadius:I
-    iget-object v1, p0, Lcom/suda/yzune/wakeupschedule/schedule/CourseDetailGlassBlurCallbackV115;->window:Landroid/view/Window;
-    invoke-virtual {v1, v0}, Landroid/view/Window;->setBackgroundBlurRadius(I)V
+    iget v1, p0, Lcom/suda/yzune/wakeupschedule/schedule/CourseDetailGlassBlurCallbackV115;->lastRadius:F
+    cmpl-float v1, v0, v1
+    if-eqz v1, :done
+    iput v0, p0, Lcom/suda/yzune/wakeupschedule/schedule/CourseDetailGlassBlurCallbackV115;->lastRadius:F
     iget-object v1, p0, Lcom/suda/yzune/wakeupschedule/schedule/CourseDetailGlassBlurCallbackV115;->fallback:Lio/github/mxwf/weeko/popup/CourseDetailBlurFallbackV115;
-    invoke-virtual {v1, v0}, Lio/github/mxwf/weeko/popup/CourseDetailBlurFallbackV115;->update(I)V
+    invoke-virtual {v1, v0}, Lio/github/mxwf/weeko/popup/CourseDetailBlurFallbackV115;->update(F)V
     iget-object v1, p0, Lcom/suda/yzune/wakeupschedule/schedule/CourseDetailGlassBlurCallbackV115;->window:Landroid/view/Window;
     invoke-virtual {v1}, Landroid/view/Window;->getAttributes()Landroid/view/WindowManager$LayoutParams;
     move-result-object v2
-    invoke-virtual {v2, v0}, Landroid/view/WindowManager$LayoutParams;->setBlurBehindRadius(I)V
+    const/4 v3, 0x0
+    invoke-virtual {v2, v3}, Landroid/view/WindowManager$LayoutParams;->setBlurBehindRadius(I)V
     iget v3, p0, Lcom/suda/yzune/wakeupschedule/schedule/CourseDetailGlassBlurCallbackV115;->maxDim:F
-    int-to-float v4, v0
+    move v4, v0
     iget v0, p0, Lcom/suda/yzune/wakeupschedule/schedule/CourseDetailGlassBlurCallbackV115;->maxRadius:I
     int-to-float v0, v0
     div-float/2addr v4, v0
