@@ -189,3 +189,29 @@ Replace-V121Text 'res/values/strings.xml' `
     '<string name="detail_delete_choice_1">All the lessons on %1$s with the same teacher and same place</string>' `
     '<string name="detail_delete_choice_1">All weeks of this time slot (%1$s, same teacher and location)</string>'
 Write-Output 'Applied v1.2.1 effect preferences and two explicit existing course-delete scopes.'
+# Both add and edit dispatch custom-time clicks through this one original method.
+$courseTimePath = Join-Path $project 'smali/com/suda/yzune/wakeupschedule/course_add/AddCourseActivity.smali'
+$courseTimeText = [IO.File]::ReadAllText($courseTimePath)
+$courseTimePattern = '(?s)\.method public final OooOoO\(IZ\)V\r?\n.*?\.end method'
+if ([regex]::Matches($courseTimeText, $courseTimePattern).Count -ne 1) { throw 'Course time entry not unique' }
+$courseTimeBody = @'
+.method public final OooOoO(IZ)V
+    .locals 0
+    invoke-static {p0, p1, p2}, Lio/github/mxwf/weeko/editor/CourseTimeRangeDialog;->show(Landroid/app/Activity;IZ)V
+    return-void
+.end method
+'@
+[IO.File]::WriteAllText($courseTimePath, [regex]::Replace($courseTimeText, $courseTimePattern, $courseTimeBody), [Text.UTF8Encoding]::new($false))
+# The remaining time entry (timetable hours) keeps its Material callbacks and modes.
+foreach ($layout in @('layout', 'layout-v22')) {
+    $timeLayoutPath = Join-Path $project "res/$layout/material_timepicker_dialog.xml"
+    $timeLayout = [IO.File]::ReadAllText($timeLayoutPath)
+    $timeLayout = $timeLayout.Replace('android:id="@id/header_title"', 'android:id="@id/header_title" android:textSize="18sp" android:fontFamily="sans-serif-medium"')
+    foreach ($button in @('material_timepicker_cancel_button', 'material_timepicker_ok_button')) {
+        $timeLayout = $timeLayout.Replace("android:id=`"@id/$button`"", "android:id=`"@id/$button`" android:textSize=`"15sp`" android:minHeight=`"48dp`"")
+    }
+    [IO.File]::WriteAllText($timeLayoutPath, $timeLayout, [Text.UTF8Encoding]::new($false))
+}
+& (Get-Command pwsh.exe).Source -NoProfile -File (Join-Path $PSScriptRoot 'replay-weeko-preclass-patches.ps1') -ProjectPath $project
+if ($LASTEXITCODE -ne 0) { throw 'Pre-class reminder replay failed' }
+
